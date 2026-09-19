@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { MyItemsQuranResponse } from "@/features/alquran/types/quran.types";
 import { alquranService } from "@/features/alquran/services/alquran.services";
 
@@ -7,7 +7,7 @@ export const useGetMyItems = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getMyItems = async (type: "quran" | "book" = "quran", classId?: string) => {
+  const getMyItems = useCallback(async (type: "quran" | "book" = "quran", classId?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -21,7 +21,7 @@ export const useGetMyItems = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   return { data, loading, error, getMyItems };
 };

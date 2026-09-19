@@ -1,7 +1,7 @@
 import { useAuthStore } from "@/features/auth/stores/auth.store";
 import { AdminDashboardPage } from "@/features/dashboard/admin/pages/AdminDashboardPage";
 import { TeacherDashboardPage } from "@/features/dashboard/teacher/pages/TeacherDashboardPage";
-import { StudentDashboardPage } from "@/features/dashboard/student/pages/StudentDashboardPage";
+import { HomeSpace } from "@/components/home/HomeSpace";
 import { useDashboardModeStore } from "@/features/dashboard/stores/dashboard-mode.store";
 import { Navigate } from "react-router";
 
@@ -22,18 +22,13 @@ export const DashboardShell = () => {
     finalRole = "teacher";
   }
 
-  const content =
-    finalRole === "admin" ? (
-      <AdminDashboardPage />
-    ) : finalRole === "teacher" ? (
-      <TeacherDashboardPage />
-    ) : (
-      <StudentDashboardPage />
-    );
+  if (finalRole === "admin") {
+    return <AdminDashboardPage />;
+  }
 
-  return (
-    <div className="min-h-screen bg-background">
-      {content}
-    </div>
-  );
+  if (finalRole === "teacher") {
+    return <TeacherDashboardPage />;
+  }
+
+  return <HomeSpace />;
 };
