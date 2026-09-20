@@ -17,10 +17,11 @@
 @theme inline {
   /* ---------- FONT SYSTEM ---------- */
   --font-primary:
-    "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    "Plus Jakarta Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: "Playfair Display", serif;
   --font-mono: "JetBrains Mono", monospace;
   --font-display: "Cinzel", serif;
+  --font-arabic: 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 
   /* ---------- RADIUS ---------- */
   --radius: 0.75rem;
@@ -487,4 +488,8 @@
   filter: blur(2px);
   pointer-events: none;
   animation: firework-flash 0.55s ease-out both;
+}
+
+.font-arabic {
+  font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
 }
