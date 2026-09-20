@@ -363,19 +363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const authUser = useAuthStore((state) => state.user);
-
-  useEffect(() => {
-    if (authUser) {
-      setUserProfile(prev => ({
-        ...prev,
-        id: authUser.id || prev.id,
-        email: authUser.email || prev.email,
-        fullName: authUser.name || prev.fullName,
-        plan: authUser.is_premium ? 'premium' : (prev.plan || 'free'),
-        role: (authUser.role as any) || prev.role || 'student',
-      }));
-    }
-  }, [authUser]);
+  const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
     try {
@@ -1045,68 +1033,128 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Sync Quran progress from PostgreSQL backend whenever token is active
-  useEffect(() => {
+  // Fetch Quran progress from PostgreSQL backend
+  const fetchQuranProgress = useCallback(async () => {
     const token = useAuthStore.getState().token;
-    if (token) {
-      quranPageService.getPagesProgress()
-        .then(res => {
-          if (res && res.pages && res.pages.length > 0) {
-            setQuranPages(prev => prev.map(p => {
-              const serverPage = res.pages.find(sp => sp.page_number === p.pageNumber);
-              if (!serverPage) return p;
-              const isMapan = serverPage.status === 'mapan' || (serverPage.stability >= 74.5 || Math.round((serverPage.stability || 0) * 0.4025587) > 30);
-              const isAct = serverPage.status !== 'new';
-              return {
-                ...p,
-                isActive: isAct,
-                status: isMapan ? 'mastered_for_now' : (isAct ? 'active' : 'inactive'),
-                mapanCelebrated: isMapan,
-                fsrsData: {
-                  ...p.fsrsData,
-                  stability: serverPage.stability || 0,
-                  difficulty: serverPage.difficulty || 5.0,
-                  reps: serverPage.review_count || 0,
-                  nextReview: serverPage.next_review_at || (isAct ? new Date().toISOString() : null),
-                  state: isMapan ? 'mastered' : (serverPage.review_count > 0 ? 'review' : 'new'),
-                }
-              };
-            }));
-          }
-        })
-        .catch(err => console.warn("Failed to fetch quran progress:", err));
+    if (!token) return;
+    try {
+      const res = await quranPageService.getPagesProgress();
+      if (res && res.pages && Array.isArray(res.pages)) {
+        const cleanPages = generateCleanQuranPages();
+        const mappedPages = cleanPages.map(p => {
+          const serverPage = res.pages.find((sp: any) => sp.page_number === p.pageNumber);
+          if (!serverPage) return p;
+          const isMapan = serverPage.status === 'mapan' || (serverPage.stability >= 74.5 || Math.round((serverPage.stability || 0) * 0.4025587) > 30);
+          const isAct = serverPage.status !== 'new';
+          return {
+            ...p,
+            isActive: isAct,
+            status: (isMapan ? 'mastered_for_now' : (isAct ? 'active' : 'inactive')) as 'inactive' | 'active' | 'mastered_for_now',
+            mapanCelebrated: isMapan,
+            fsrsData: {
+              ...p.fsrsData,
+              stability: serverPage.stability || 0,
+              difficulty: serverPage.difficulty || 5.0,
+              reps: serverPage.review_count || 0,
+              nextReview: serverPage.next_review_at || (isAct ? new Date().toISOString() : null),
+              state: (isMapan ? 'mastered' : (serverPage.review_count > 0 ? 'review' : 'new')) as any,
+            }
+          };
+        });
+        setQuranPages(mappedPages);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch quran progress:", err);
     }
   }, []);
 
   // Fetch user books from PostgreSQL Backend
-  const fetchUserBooks = useCallback(async () => {
+  const fetchUserBooks = useCallback(async (overrideUid?: string) => {
     const token = useAuthStore.getState().token;
     if (!token) return;
     try {
       const res = await personalService.getBooks();
       if (res && res.data) {
+        const uid = overrideUid || useAuthStore.getState().user?.id || userProfile.id;
+        const author = useAuthStore.getState().user?.name || userProfile.fullName;
         const serverBooks: Book[] = res.data.map((b: any) => ({
           id: b.id,
-          userId: userProfile.id,
+          userId: uid,
           title: b.title,
           description: b.description || '',
           coverUrl: b.cover_image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
           isPublic: b.is_public ?? false,
           category: 'Umum',
           isReadonly: false,
-          authorName: b.author?.name || userProfile.fullName,
+          authorName: b.author?.name || author,
           createdAt: b.created_at || new Date().toISOString(),
           updatedAt: b.updated_at || new Date().toISOString(),
         }));
-        setBooks(prev => {
-          const otherBooks = prev.filter(p => !serverBooks.some(sb => sb.id === p.id));
-          return [...serverBooks, ...otherBooks];
-        });
+        // Cleanly replace books state with only books belonging to this user
+        setBooks(serverBooks);
       }
     } catch (err) {
       console.warn("Failed to fetch books from backend:", err);
     }
   }, [userProfile.id, userProfile.fullName]);
+
+  // React to authUser / token changes (PostgreSQL JWT login/switch/logout)
+  useEffect(() => {
+    const currentUserId = authUser?.id || 'guest';
+    if (authUser && authUser.id) {
+      const targetId = authUser.id;
+      if (loadedUserIdRef.current !== targetId) {
+        loadedUserIdRef.current = targetId;
+
+        setUserProfile({
+          id: targetId,
+          quranSpaceCode: `UNL-QRN-${targetId.slice(0, 4).toUpperCase()}`,
+          fullName: authUser.name || 'Santri',
+          email: authUser.email || '',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          plan: authUser.is_premium ? 'premium' : 'free',
+          role: (authUser.role as any) || 'student',
+          onboardingPreferences: defaultOnboardingPreferences,
+        });
+
+        // Load isolated user data (clean state for fresh accounts)
+        const accountData = loadUserData(targetId);
+        setQuranPages(accountData.quranPages);
+        setBooks(accountData.books);
+        setChapters(accountData.chapters);
+        setItems(accountData.items);
+        setMyClasses(accountData.myClasses);
+        setTeachingClasses(accountData.teachingClasses);
+        setTeacherFeedbacks(accountData.teacherFeedbacks);
+        setAttendanceExceptions(accountData.attendanceExceptions);
+
+        // Fetch fresh server data from PostgreSQL backend for this user
+        fetchUserBooks(targetId);
+        fetchQuranProgress();
+      }
+    } else if (!authUser && loadedUserIdRef.current && loadedUserIdRef.current !== 'guest') {
+      loadedUserIdRef.current = 'guest';
+      const guestProfile: UserProfile = {
+        id: 'guest',
+        quranSpaceCode: 'UNL-QRN-GUEST',
+        fullName: 'Tamu / Murid',
+        email: '',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        plan: 'free',
+        onboardingPreferences: defaultOnboardingPreferences,
+      };
+      setUserProfile(guestProfile);
+      const guestData = loadUserData('guest');
+      setQuranPages(guestData.quranPages);
+      setBooks(guestData.books);
+      setChapters(guestData.chapters);
+      setItems(guestData.items);
+      setMyClasses(guestData.myClasses);
+      setTeachingClasses(guestData.teachingClasses);
+      setTeacherFeedbacks(guestData.teacherFeedbacks);
+      setAttendanceExceptions(guestData.attendanceExceptions);
+    }
+  }, [authUser, token, fetchUserBooks, fetchQuranProgress]);
 
   // Load hierarchical Book Tree (Book -> Module -> Submodule / Card)
   const loadBookTree = useCallback(async (bookId: string) => {
