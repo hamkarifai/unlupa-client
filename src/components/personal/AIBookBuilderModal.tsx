@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Sparkles, Loader2, BookOpen, Crown } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Language } from '../../types';
+import { personalService } from '@/features/personal/services/personal.services';
 
 interface AIBookBuilderModalProps {
   onClose: () => void;
@@ -44,38 +45,23 @@ export function AIBookBuilderModal({ onClose, onImport, language }: AIBookBuilde
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/generate-book', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, text, mode: 'formatted', language }),
+      const response = await personalService.generateAIBook({
+        topic: topic.trim(),
+        text: text.trim(),
+        language,
       });
-      
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        if (response.status === 503) {
-          throw new Error(language === 'en' ? 'The AI service is experiencing high demand. Please try again.' : 'Layanan AI sedang sibuk. Silakan coba lagi.');
-        }
-        throw new Error('Failed to parse server response');
-      }
-      
-      if (!response.ok) {
-        if (response.status === 503 || (data.error && data.error.includes('503'))) {
-           throw new Error(language === 'en' ? 'The AI service is experiencing high demand. Please try again.' : 'Layanan AI sedang sibuk. Silakan coba lagi.');
-        }
-        throw new Error(data.error || 'Failed to generate');
-      }
-      
-      if (data.book && data.book.title && Array.isArray(data.book.chapters)) {
+
+      const book = response?.data?.book;
+      if (book && book.title && Array.isArray(book.chapters)) {
         recordAIUsage();
-        onImport(data.book);
+        onImport(book);
       } else {
         setError(language === 'en' ? 'No book could be generated.' : 'Gagal menghasilkan buku.');
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Error communicating with AI service');
+      const msg = err?.response?.data?.message || err?.message || 'Error communicating with AI service';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
