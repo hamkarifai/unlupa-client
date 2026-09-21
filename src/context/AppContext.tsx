@@ -1264,42 +1264,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try { 
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Filter out legacy dummy sample books
+          const clean = parsed.filter((p: any) => p && !String(p.id).startsWith('lib-') && !String(p.book?.id).startsWith('lib-book-'));
+          return clean;
+        }
       } catch (e) { }
     }
-    return CURATED_LIBRARY;
+    return [];
   });
   
   useEffect(() => {
     localStorage.setItem('ai_quran_library', JSON.stringify(library));
   }, [library]);
 
-  // Load public library from Firestore on mount
-  useEffect(() => {
-    let isMounted = true;
-    const loadPublicLibrary = async () => {
-      try {
-        const fetched = await fetchPublicLibrary();
-        if (isMounted && fetched && fetched.length > 0) {
-          // Merge with CURATED_LIBRARY (or local ones) prioritizing firestore
-          setLibrary(prev => {
-            const merged = [...fetched];
-            const fetchedIds = new Set(fetched.map(f => f.id));
-            prev.forEach(p => {
-              if (!fetchedIds.has(p.id)) {
-                merged.push(p);
-              }
-            });
-            return merged;
-          });
-        }
-      } catch (e) {
-        console.warn('Failed to load public library from Firestore', e);
-      }
-    };
-    loadPublicLibrary();
-    return () => { isMounted = false; };
+  const fetchPublishedLibrary = useCallback(async () => {
+    try {
+      const res = await personalService.getPublishedBooks();
+      const booksData = res?.data || [];
+      const libraryEntries: LibraryEntry[] = booksData.map((b: any) => ({
+        id: b.id,
+        book: {
+          id: b.id,
+          userId: b.owner_id || '',
+          title: b.title || 'Untitled Book',
+          description: b.description || '',
+          coverUrl: b.cover_image || '',
+          isPublic: true,
+          isReadonly: false,
+          authorName: b.owner_name || 'Penulis',
+          category: b.category || 'Umum',
+          price: b.price || 0,
+          createdAt: b.created_at || new Date().toISOString(),
+          updatedAt: b.updated_at || new Date().toISOString(),
+        },
+        chapters: [],
+        items: [],
+        downloads: b.total_added || 0,
+        rating: 5.0,
+        curator: b.owner_name || 'Penulis Terverifikasi',
+        verified: true,
+      }));
+      setLibrary(libraryEntries);
+    } catch (e) {
+      console.warn('Failed to load published library from backend API', e);
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchPublishedLibrary();
+  }, [fetchPublishedLibrary]);
 
   // Sync to localStorage scoped by user
   useEffect(() => {
@@ -2238,15 +2252,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Library & Import/Export
-  const importFromLibrary = (libId: string) => {
+  const importFromLibrary = async (libId: string) => {
     const entry = library.find(l => l.id === libId);
     if (!entry) return;
 
     // Check if already imported
-    const alreadyImported = books.some(b => b.id === entry.book.id);
+    const alreadyImported = books.some(b => b.id === entry.book.id || (b.title && b.title === entry.book.title));
     if (alreadyImported) {
-      alert('This book is already in your Personal Space!');
+      alert(language === 'en' ? 'This book is already in your Personal Space!' : 'Kitab ini sudah ada di Ruang Pribadi Anda!');
       return;
+    }
+
+    try {
+      if (entry.book?.id) {
+        await personalService.addPublishedBookToMyBooks(entry.book.id);
+        await fetchUserBooks();
+        await fetchPublishedLibrary();
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend addPublishedBookToMyBooks error, fallback to local state:', err);
     }
 
     // Reset-on-clone: initialize card activation and FSRS data to 'new' (unactivated state)
@@ -2308,58 +2333,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  
   const publishBookToLibrary = async (
     bookId: string, 
-    allowEdit = false, 
-    pricing?: { isPaid: boolean; price?: number }
+    _allowEdit = false, 
+    _pricing?: { isPaid: boolean; price?: number }
   ) => {
-    const book = books.find(b => b.id === bookId);
-    if (!book) return { success: false, message: 'Book not found' };
-    
-    // Check if already in library
-    if (library.some(l => l.book.id === bookId)) {
-      return { success: false, message: language === 'en' ? 'Book is already in the library' : 'Kitab ini sudah ada di Pustaka' };
+    try {
+      await personalService.requestPublishBook(bookId);
+      await fetchUserBooks();
+      await fetchPublishedLibrary();
+      return { 
+        success: true, 
+        message: language === 'en' 
+          ? 'Alhamdulillah, book publication requested!' 
+          : 'Alhamdulillah, pengajuan publikasi kitab berhasil dikirim!' 
+      };
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Gagal mempublikasikan kitab';
+      return {
+        success: false,
+        message: msg
+      };
     }
-    
-    const bookChapters = chapters.filter(c => c.bookId === bookId);
-    const bookItems: BookItem[] = items.filter(i => i.bookId === bookId).map(i => ({
-      ...i,
-      isActive: false,
-      status: 'inactive' as const,
-      fsrsData: createInitialFSRSState()
-    }));
-
-    const isPaid = Boolean(pricing?.isPaid && (pricing.price || 0) > 0);
-    const priceAmount = isPaid ? (pricing?.price || 0) : 0;
-    
-    const newEntry = {
-      id: `lib-${Date.now()}`,
-      title: book.title,
-      description: book.description || 'Community published book',
-      category: book.category || 'Community',
-      curator: book.authorName || 'Penulis Pribadi',
-      downloads: 0,
-      rating: 5.0,
-      verified: true,
-      book: { 
-        ...book, 
-        isReadonly: !allowEdit,
-        price: priceAmount,
-        isPublic: true
-      },
-      chapters: bookChapters,
-      items: bookItems,
-      tags: ['community']
-    };
-    
-    setLibrary(prev => [newEntry, ...prev]);
-    return { 
-      success: true, 
-      message: language === 'en' 
-        ? 'Alhamdulillah, book successfully published to Library!' 
-        : 'Alhamdulillah, kitab berhasil dipublikasikan ke Pustaka!' 
-    };
   };
 
   const exportBookJSON = (bookId: string): string => {

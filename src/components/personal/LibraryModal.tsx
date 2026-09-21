@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LibraryEntry } from '../../data/sampleBooks';
+import { Chapter, BookItem, createInitialFSRSState } from '../../types';
+import { personalService } from '@/features/personal/services/personal.services';
 import { BilingualCardText } from '../common/BilingualCardText';
 import { 
   X, 
@@ -21,7 +23,8 @@ import {
   SlidersHorizontal,
   Check,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 
 interface Props {
@@ -46,6 +49,81 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [previewEntry, setPreviewEntry] = useState<LibraryEntry | null>(null);
   const [previewSelectedChapterId, setPreviewSelectedChapterId] = useState<string | null>(null);
   const [justImportedId, setJustImportedId] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Load preview book details and tree dynamically from backend API if empty
+  useEffect(() => {
+    if (previewEntry && (!previewEntry.items || previewEntry.items.length === 0) && previewEntry.book?.id) {
+      setIsLoadingPreview(true);
+      personalService.getBookTree(previewEntry.book.id)
+        .then(res => {
+          if (res?.data) {
+            const tree = res.data;
+            const chaptersList: Chapter[] = [];
+            const itemsList: BookItem[] = [];
+
+            if (Array.isArray(tree.items)) {
+              tree.items.forEach((item: any) => {
+                itemsList.push({
+                  id: item.id,
+                  bookId: tree.book_id || previewEntry.book.id,
+                  chapterId: '',
+                  question: item.question || '',
+                  answer: item.answer || '',
+                  isActive: false,
+                  status: 'inactive',
+                  fsrsData: createInitialFSRSState(),
+                  createdAt: new Date().toISOString(),
+                });
+              });
+            }
+
+            const flattenModules = (mods: any[], parentId: string | null = null) => {
+              mods.forEach(mod => {
+                chaptersList.push({
+                  id: mod.id,
+                  bookId: tree.book_id || previewEntry.book.id,
+                  parentId,
+                  title: mod.title,
+                  description: mod.description,
+                  order: mod.order || 1,
+                });
+                if (Array.isArray(mod.items)) {
+                  mod.items.forEach((item: any) => {
+                    itemsList.push({
+                      id: item.id,
+                      bookId: tree.book_id || previewEntry.book.id,
+                      chapterId: mod.id,
+                      question: item.question || '',
+                      answer: item.answer || '',
+                      isActive: false,
+                      status: 'inactive',
+                      fsrsData: createInitialFSRSState(),
+                      createdAt: new Date().toISOString(),
+                    });
+                  });
+                }
+                if (Array.isArray(mod.children) && mod.children.length > 0) {
+                  flattenModules(mod.children, mod.id);
+                }
+              });
+            };
+
+            if (Array.isArray(tree.modules)) {
+              flattenModules(tree.modules);
+            }
+
+            setPreviewEntry(prev => prev ? { ...prev, chapters: chaptersList, items: itemsList } : null);
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to load preview tree:', err);
+        })
+        .finally(() => {
+          setIsLoadingPreview(false);
+        });
+    }
+  }, [previewEntry?.id]);
 
   if (!isOpen) return null;
 
@@ -85,8 +163,8 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
       return 0;
     });
 
-  const handleImport = (entry: LibraryEntry) => {
-    importFromLibrary(entry.id);
+  const handleImport = async (entry: LibraryEntry) => {
+    await importFromLibrary(entry.id);
     setJustImportedId(entry.id);
     setTimeout(() => {
       setJustImportedId(null);
@@ -452,42 +530,55 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     <span>{language === 'en' ? 'Sample Flashcards' : 'Sampel Kartu Q&A'} ({selectedPreviewChapterCards.length})</span>
                   </h5>
 
-                  <div className="space-y-2.5">
-                    {selectedPreviewChapterCards.map((card, idx) => (
-                      <div
-                        key={card.id || idx}
-                        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-2"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                            Q
-                          </span>
-                          <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-relaxed flex-1">
-                            <BilingualCardText text={card.question} />
-                          </div>
+                  {isLoadingPreview ? (
+                    <div className="flex items-center justify-center py-10 gap-2 text-slate-400 text-xs">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                      <span>{language === 'en' ? 'Loading book content...' : 'Memuat isi materi kitab...'}</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {selectedPreviewChapterCards.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                          {language === 'en' ? 'No cards available in this chapter yet.' : 'Belum ada kartu hafalan di bab ini.'}
                         </div>
-
-                        <div className="flex items-start gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                            A
-                          </span>
-                          <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
-                            <BilingualCardText text={card.answer} />
-                          </div>
-                        </div>
-
-                        {card.tags && card.tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 pt-1">
-                            {card.tags.map((tag, tIdx) => (
-                              <span key={tIdx} className="px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400 text-[10px] font-medium">
-                                #{tag}
+                      ) : (
+                        selectedPreviewChapterCards.map((card, idx) => (
+                          <div
+                            key={card.id || idx}
+                            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-2"
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                Q
                               </span>
-                            ))}
+                              <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-relaxed flex-1">
+                                <BilingualCardText text={card.question} />
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                              <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                A
+                              </span>
+                              <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
+                                <BilingualCardText text={card.answer} />
+                              </div>
+                            </div>
+
+                            {card.tags && card.tags.length > 0 && (
+                              <div className="flex items-center gap-1.5 pt-1">
+                                {card.tags.map((tag, tIdx) => (
+                                  <span key={tIdx} className="px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400 text-[10px] font-medium">
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
