@@ -365,12 +365,16 @@ export const personalService = {
   },
 
   async generateAIBook(payload: { topic?: string; text?: string; language?: string }): Promise<{ status: number; message: string; data: { book: any } }> {
-    const response = await api.post("/api/v1/ai/generate-book", payload);
+    const response = await api.post("/api/v1/ai/generate-book", payload, {
+      timeout: 120000,
+    });
     return response.data;
   },
 
   async generateAICards(payload: { topic?: string; text?: string; language?: string }): Promise<{ status: number; message: string; data: { cards: any[] } }> {
-    const response = await api.post("/api/v1/ai/generate-cards", payload);
+    const response = await api.post("/api/v1/ai/generate-cards", payload, {
+      timeout: 120000,
+    });
     return response.data;
   },
 };
