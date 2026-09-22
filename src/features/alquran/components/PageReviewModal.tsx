@@ -111,73 +111,66 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
         </div>
 
         {/* FSRS Rating Options */}
-        <div className="space-y-2">
-          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3 text-center">
-            Bagaimana kelancaran tilawah / hafalan halaman ini?
-          </p>
+        {(() => {
+          const isRating3Allowed = (page.stability || 0) > 30 || page.status === "mapan";
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <button
-              disabled={reviewMutation.isPending}
-              onClick={() => handleReview(1)}
-              className="flex flex-col items-center justify-center p-3 rounded-xl border border-red-500/25 bg-red-500/5 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer disabled:opacity-50"
-            >
-              {reviewMutation.isPending && selectedRating === 1 ? (
-                <Loader2 className="w-4 h-4 animate-spin my-1" />
-              ) : (
-                <>
-                  <span className="text-xs font-bold font-mono">1 • Again</span>
-                  <span className="text-[10px] opacity-75">Banyak Lupa</span>
-                </>
-              )}
-            </button>
+          return (
+            <div className="space-y-2">
+              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3 text-center">
+                Bagaimana kelancaran tilawah / hafalan halaman ini?
+              </p>
 
-            <button
-              disabled={reviewMutation.isPending}
-              onClick={() => handleReview(2)}
-              className="flex flex-col items-center justify-center p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition cursor-pointer disabled:opacity-50"
-            >
-              {reviewMutation.isPending && selectedRating === 2 ? (
-                <Loader2 className="w-4 h-4 animate-spin my-1" />
-              ) : (
-                <>
-                  <span className="text-xs font-bold font-mono">2 • Hard</span>
-                  <span className="text-[10px] opacity-75">Kurang Lancar</span>
-                </>
-              )}
-            </button>
+              <div className={`grid ${isRating3Allowed ? "grid-cols-3" : "grid-cols-2"} gap-2.5`}>
+                <button
+                  disabled={reviewMutation.isPending}
+                  onClick={() => handleReview(1)}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl border border-red-500/25 bg-red-500/5 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer disabled:opacity-50"
+                >
+                  {reviewMutation.isPending && selectedRating === 1 ? (
+                    <Loader2 className="w-4 h-4 animate-spin my-1" />
+                  ) : (
+                    <>
+                      <span className="text-xs font-bold font-mono">1 • Again</span>
+                      <span className="text-[10px] opacity-75">Banyak Lupa</span>
+                    </>
+                  )}
+                </button>
 
-            <button
-              disabled={reviewMutation.isPending}
-              onClick={() => handleReview(3)}
-              className="flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition cursor-pointer disabled:opacity-50"
-            >
-              {reviewMutation.isPending && selectedRating === 3 ? (
-                <Loader2 className="w-4 h-4 animate-spin my-1" />
-              ) : (
-                <>
-                  <span className="text-xs font-bold font-mono">3 • Good</span>
-                  <span className="text-[10px] opacity-75">Lancar</span>
-                </>
-              )}
-            </button>
+                <button
+                  disabled={reviewMutation.isPending}
+                  onClick={() => handleReview(2)}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500/25 bg-blue-500/5 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition cursor-pointer disabled:opacity-50"
+                >
+                  {reviewMutation.isPending && selectedRating === 2 ? (
+                    <Loader2 className="w-4 h-4 animate-spin my-1" />
+                  ) : (
+                    <>
+                      <span className="text-xs font-bold font-mono">2 • Hard</span>
+                      <span className="text-[10px] opacity-75">Lancar</span>
+                    </>
+                  )}
+                </button>
 
-            <button
-              disabled={reviewMutation.isPending}
-              onClick={() => handleReview(4)}
-              className="flex flex-col items-center justify-center p-3 rounded-xl border border-sky-500/25 bg-sky-500/5 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition cursor-pointer disabled:opacity-50"
-            >
-              {reviewMutation.isPending && selectedRating === 4 ? (
-                <Loader2 className="w-4 h-4 animate-spin my-1" />
-              ) : (
-                <>
-                  <span className="text-xs font-bold font-mono">4 • Easy</span>
-                  <span className="text-[10px] opacity-75">Sangat Fasih</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+                {isRating3Allowed && (
+                  <button
+                    disabled={reviewMutation.isPending}
+                    onClick={() => handleReview(3)}
+                    className="flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition cursor-pointer disabled:opacity-50 animate-in fade-in"
+                  >
+                    {reviewMutation.isPending && selectedRating === 3 ? (
+                      <Loader2 className="w-4 h-4 animate-spin my-1" />
+                    ) : (
+                      <>
+                        <span className="text-xs font-bold font-mono">3 • Mutqin</span>
+                        <span className="text-[10px] opacity-75">Sangat Fasih</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -311,52 +311,63 @@ export const DailyReviewFlashcardModal = ({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {REVIEW_BUTTONS.map((btn) => {
-                  const isSubmitting = submittingButtonId === btn.id;
-                  return (
-                    <button
-                      key={btn.id}
-                      type="button"
-                      onClick={() => void handleRatingClick(btn)}
-                      disabled={submittingButtonId !== null}
-                      className={`relative group min-w-0 overflow-hidden rounded-xl border bg-card border-border flex flex-col text-left transition-all duration-200 active:scale-95 disabled:opacity-60 disabled:pointer-events-none ${btn.hoverBorder} ${btn.hoverBg}`}
-                    >
-                      <div className="flex items-center gap-2 p-3 border-b border-border">
-                        <span className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 group-active:scale-110 transition-transform ${btn.accentBg}`}>
-                          <btn.icon className={`w-3.5 h-3.5 ${btn.accent}${btn.id === 4 ? " animate-pulse" : ""}`} />
-                        </span>
-                        <span className={`text-xs font-semibold ${btn.accent}`}>{btn.header}</span>
-                        <span className={`ml-auto shrink-0 w-1.5 h-1.5 rounded-full ${btn.dot}`} />
-                      </div>
-                      <div className="flex-1 p-3">
-                        {isSubmitting ? (
-                          <div className="flex flex-col items-center justify-center gap-2 py-3">
-                            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              Menyimpan...
+              {(() => {
+                const isStabilityOver30 = ((task as any)?.stability || 0) > 30 || task?.status === "graduate" || task?.status === "mapan";
+                const availableButtons = REVIEW_BUTTONS.filter((btn) => {
+                  if (btn.id === 4) return false; // Al-Qur'an uses rating 1 - 3 only
+                  if (btn.id === 3) return isStabilityOver30; // Rating 3 only when stability > 30
+                  return true;
+                });
+
+                return (
+                  <div className={`grid ${availableButtons.length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
+                    {availableButtons.map((btn) => {
+                      const isSubmitting = submittingButtonId === btn.id;
+                      return (
+                        <button
+                          key={btn.id}
+                          type="button"
+                          onClick={() => void handleRatingClick(btn)}
+                          disabled={submittingButtonId !== null}
+                          className={`relative group min-w-0 overflow-hidden rounded-xl border bg-card border-border flex flex-col text-left transition-all duration-200 active:scale-95 disabled:opacity-60 disabled:pointer-events-none ${btn.hoverBorder} ${btn.hoverBg}`}
+                        >
+                          <div className="flex items-center gap-2 p-3 border-b border-border">
+                            <span className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 group-active:scale-110 transition-transform ${btn.accentBg}`}>
+                              <btn.icon className={`w-3.5 h-3.5 ${btn.accent}`} />
                             </span>
+                            <span className={`text-xs font-semibold ${btn.accent}`}>{btn.header}</span>
+                            <span className={`ml-auto shrink-0 w-1.5 h-1.5 rounded-full ${btn.dot}`} />
                           </div>
-                        ) : (
-                          <ul className="space-y-1">
-                            {btn.descriptions.map((d) => (
-                              <li
-                                key={d}
-                                className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground"
-                              >
-                                <span
-                                  className={`shrink-0 w-1.5 h-1.5 rounded-full ${btn.dot}`}
-                                />
-                                {d}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                          <div className="flex-1 p-3">
+                            {isSubmitting ? (
+                              <div className="flex flex-col items-center justify-center gap-2 py-3">
+                                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">
+                                  Menyimpan...
+                                </span>
+                              </div>
+                            ) : (
+                              <ul className="space-y-1">
+                                {btn.descriptions.map((d) => (
+                                  <li
+                                    key={d}
+                                    className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground"
+                                  >
+                                    <span
+                                      className={`shrink-0 w-1.5 h-1.5 rounded-full ${btn.dot}`}
+                                    />
+                                    {d}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

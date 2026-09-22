@@ -644,15 +644,15 @@ export const QuranReviewModal: React.FC<Props> = ({
                       </div>
                     )}
 
-                    {/* 3 Feedback Rating Buttons (Rating 3 activated dynamically when Mapan status reached or by Teacher) */}
+                    {/* Rating 1 - 3 Buttons (Rating 3 strictly visible ONLY when stability > 30 days) */}
                     {(() => {
                       const isItemDue = isDue(currentItem.fsrsData.nextReview, currentItem.isActive);
-                      const isMapanEver = currentItem.status === 'mastered_for_now' || !!currentItem.mapanCelebrated || (currentItem.fsrsData.stability || 0) * 0.4025587 >= 30;
-                      const isRating3Allowed = isMapanEver || isTeacher;
+                      const isStabilityOver30 = (currentItem.fsrsData.stability || 0) > 30 || currentItem.status === 'mastered_for_now' || !!currentItem.mapanCelebrated;
+                      const isRating3Allowed = isStabilityOver30 || isTeacher;
                       const qIntervals = predictQuranIntervals(currentItem.fsrsData, currentItem.mapanSchedule);
 
                       return (
-                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className={`grid ${isRating3Allowed ? 'grid-cols-3' : 'grid-cols-2'} gap-2 sm:gap-3`}>
                           {/* Rating 1: Belum (Review) */}
                           <button
                             type="button"
@@ -679,7 +679,7 @@ export const QuranReviewModal: React.FC<Props> = ({
                             </span>
                           </button>
 
-                          {/* Rating 2: Lancar (Fluent) - The standard best rating before Mapan */}
+                          {/* Rating 2: Lancar (Fluent) - Standard review rating */}
                           <button
                             type="button"
                             onClick={() => {
@@ -705,37 +705,31 @@ export const QuranReviewModal: React.FC<Props> = ({
                             </span>
                           </button>
 
-                          {/* Rating 3: Mutqin (Mastered) - Dynamic based on Mapan status or Teacher mode */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isItemDue && isRating3Allowed) handleRating(3);
-                            }}
-                            disabled={!isItemDue || !isRating3Allowed || !!justRated}
-                            className={`flex flex-col items-center justify-center py-2.5 sm:py-3 px-2 rounded-2xl border transition-all shadow-xs relative overflow-hidden ${
-                              justRated?.rating === 3
-                                ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-400 scale-[1.02]'
-                                : isItemDue && isRating3Allowed
-                                ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-600 hover:bg-emerald-700 text-white active:scale-[0.98] cursor-pointer shadow-emerald-600/20'
-                                : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-850 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
-                            }`}
-                            title={
-                              !isRating3Allowed
-                                ? (language === 'en' ? 'Locked: Available once item reaches Mastered (>30d interval) or via Teacher in Class' : 'Terkunci: Aktif otomatis setelah hafalan mencapai status Mapan (>30 hari) atau dinilai oleh Guru di Ruang Mengajar')
-                                : isTeacher && !isMapanEver
-                                ? (language === 'en' ? 'Mutqin (Teacher Assessment / Direct Boost)' : 'Lancar Mutqin (Penilaian Guru Halaqah)')
-                                : (language === 'en' ? 'Fluent Mutqin (Optimal interval boost)' : 'Lancar Mutqin (Kenaikan cepat optimal)')
-                            }
-                          >
-                            <span className={`text-[10px] sm:text-xs font-semibold leading-none ${
-                              justRated?.rating === 3 || (isItemDue && isRating3Allowed) ? 'text-emerald-100' : 'text-slate-400 dark:text-slate-500'
-                            }`}>
-                              {isRating3Allowed ? `+${qIntervals.goodDays}${language === 'en' ? 'd' : ' hr'}` : '🔒 Mapan'}
-                            </span>
-                            <span className="font-bold text-xs sm:text-sm mt-1">
-                              {language === 'en' ? 'Mutqin' : 'Mutqin'}
-                            </span>
-                          </button>
+                          {/* Rating 3: Mutqin (Mastered) - Strictly appears only when stability > 30 days */}
+                          {isRating3Allowed && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isItemDue) handleRating(3);
+                              }}
+                              disabled={!isItemDue || !!justRated}
+                              className={`flex flex-col items-center justify-center py-2.5 sm:py-3 px-2 rounded-2xl border transition-all shadow-xs relative overflow-hidden animate-in fade-in zoom-in-95 ${
+                                justRated?.rating === 3
+                                  ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-400 scale-[1.02]'
+                                  : isItemDue
+                                  ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-600 hover:bg-emerald-700 text-white active:scale-[0.98] cursor-pointer shadow-emerald-600/20'
+                                  : 'border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-850 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
+                              }`}
+                              title={language === 'en' ? 'Mutqin (Optimal Mastered Boost)' : 'Lancar Mutqin (Kenaikan optimal stabilitas > 30 hari)'}
+                            >
+                              <span className="text-[10px] sm:text-xs font-semibold leading-none text-emerald-100">
+                                +{qIntervals.goodDays}{language === 'en' ? 'd' : ' hr'}
+                              </span>
+                              <span className="font-bold text-xs sm:text-sm mt-1">
+                                {language === 'en' ? 'Mutqin' : 'Mutqin'}
+                              </span>
+                            </button>
+                          )}
                         </div>
                       );
                     })()}
