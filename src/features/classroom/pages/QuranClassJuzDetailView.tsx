@@ -504,7 +504,7 @@ export const QuranClassJuzDetailView = () => {
                                     {item.status}
                                   </span>
                                   <span className="text-xs text-muted-foreground">
-                                    {item.item_id.slice(0, 8)}
+                                    {String(item.item_id).slice(0, 8)}
                                   </span>
                                 </div>
                               </div>

@@ -1,6 +1,5 @@
 import { useAuthStore } from "@/features/auth/stores/auth.store";
 import { AdminDashboardPage } from "@/features/dashboard/admin/pages/AdminDashboardPage";
-import { TeacherDashboardPage } from "@/features/dashboard/teacher/pages/TeacherDashboardPage";
 import { HomeSpace } from "@/components/home/HomeSpace";
 import { useDashboardModeStore } from "@/features/dashboard/stores/dashboard-mode.store";
 import { Navigate } from "react-router";
@@ -27,7 +26,7 @@ export const DashboardShell = () => {
   }
 
   if (finalRole === "teacher") {
-    return <TeacherDashboardPage />;
+    return <Navigate to="/dashboard/kelas" replace />;
   }
 
   return <HomeSpace />;

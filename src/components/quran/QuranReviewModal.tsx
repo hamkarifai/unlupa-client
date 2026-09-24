@@ -652,7 +652,7 @@ export const QuranReviewModal: React.FC<Props> = ({
                       const qIntervals = predictQuranIntervals(currentItem.fsrsData, currentItem.mapanSchedule);
 
                       return (
-                        <div className={`grid ${isRating3Allowed ? 'grid-cols-3' : 'grid-cols-2'} gap-2 sm:gap-3`}>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
                           {/* Rating 1: Belum (Review) */}
                           <button
                             type="button"
@@ -705,8 +705,8 @@ export const QuranReviewModal: React.FC<Props> = ({
                             </span>
                           </button>
 
-                          {/* Rating 3: Mutqin (Mastered) - Strictly appears only when stability > 30 days */}
-                          {isRating3Allowed && (
+                          {/* Rating 3: Mutqin (Mastered) - Locked until stability > 30 days */}
+                          {isRating3Allowed ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -728,6 +728,19 @@ export const QuranReviewModal: React.FC<Props> = ({
                               <span className="font-bold text-xs sm:text-sm mt-1">
                                 {language === 'en' ? 'Mutqin' : 'Mutqin'}
                               </span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="flex flex-col items-center justify-center py-2.5 sm:py-3 px-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60 select-none shadow-xs"
+                              title={language === 'en' ? 'Locked: Requires stability > 30 days' : 'Terkunci: Memerlukan stabilitas > 30 hari'}
+                            >
+                              <Lock className="w-3.5 h-3.5 mb-1 text-slate-400 dark:text-slate-500" />
+                              <span className="font-bold text-xs sm:text-sm">
+                                Mutqin
+                              </span>
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">&gt;30 Hari</span>
                             </button>
                           )}
                         </div>

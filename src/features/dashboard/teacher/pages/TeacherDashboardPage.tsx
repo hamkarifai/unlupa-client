@@ -19,6 +19,7 @@ import {
 import type { ClassItem, ClassroomCardTone } from "@/features/classroom/types";
 import { CreateClassButton } from "@/features/classroom/components/dashboard/CreateClassButton";
 import { CreateClassModal } from "@/features/classroom/components/dashboard/modals/CreateClassModal";
+import { classroomService } from "@/features/classroom/services/classroom.service";
 import { SuccessModal } from "@/components/ui/SuccessModal";
 import { EditClassModal } from "@/features/classroom/components/dashboard/modals/EditClassModal";
 import { ConfirmModal } from "@/features/classroom/components/dashboard/modals/ConfirmModal";
@@ -234,14 +235,26 @@ export const TeacherDashboardPage = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreate={(data) => {
-          mutate(data, {
-            onSuccess: () => {
+          const { assignedBookId, targetJuz: _targetJuz, ...classPayload } = data;
+          mutate(classPayload, {
+            onSuccess: async (createdClass) => {
+              if (data.type === "book" && assignedBookId && createdClass?.id) {
+                try {
+                  await classroomService.addBookToClass(createdClass.id, {
+                    book_id: assignedBookId,
+                    order: 1,
+                  });
+                } catch (err) {
+                  console.warn("Failed to auto-attach initial book to class:", err);
+                }
+              }
+
               setIsCreateModalOpen(false);
               setSuccessModal({
                 isOpen: true,
                 title: "Kelas berhasil dibuat",
                 description:
-                  "Kelas berhasil dibuat, anda dapat melihatnya di halaman kelas",
+                  "Kelas berhasil dibuat, Anda dapat mengelola siswa dan materi di dalamnya.",
               });
               setTimeout(() => {
                 setSuccessModal((prev) => ({
@@ -256,7 +269,7 @@ export const TeacherDashboardPage = () => {
                 isOpen: true,
                 title: "Gagal membuat kelas",
                 description:
-                  "Kelas gagal dibuat, anda dapat melihatnya di halaman kelas",
+                  "Kelas gagal dibuat. Silakan coba beberapa saat lagi.",
               });
               setTimeout(() => {
                 setSuccessModal((prev) => ({

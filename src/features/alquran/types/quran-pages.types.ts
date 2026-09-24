@@ -10,6 +10,7 @@ export interface QuranPageSummary {
   next_review_at?: string;
   review_count: number;
   is_due: boolean;
+  has_reached_mapan?: boolean;
 }
 
 export interface QuranPagesStats {

@@ -22,14 +22,11 @@ import { isDue } from '../../lib/fsrs';
 import { ClassGroup, ClassStudent } from '../../types';
 
 interface Props {
-  onOpenQuranReview: (juzNumber?: number) => void;
-  onOpenPersonalReview: () => void;
+  onOpenQuranReview?: (juzNumber?: number) => void;
+  onOpenPersonalReview?: () => void;
 }
 
-export const SwipeableReviewQueue: React.FC<Props> = ({
-  onOpenQuranReview,
-  onOpenPersonalReview
-}) => {
+export const SwipeableReviewQueue: React.FC<Props> = () => {
   const { 
     quranStats, 
     personalStats, 
@@ -327,21 +324,12 @@ export const SwipeableReviewQueue: React.FC<Props> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                    {quranStats.dueToday > 0 && (
-                      <button
-                        onClick={() => onOpenQuranReview()}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs shadow-md shadow-orange-500/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-white" />
-                        <span>{language === 'en' ? 'Start Review' : 'Mulai Murajaah'}</span>
-                      </button>
-                    )}
                     <button
                       onClick={() => setActiveSpace('quran')}
-                      className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-[#161c2c] hover:bg-[#1f273d] text-slate-200 border border-slate-700/80 font-bold text-xs transition-all cursor-pointer whitespace-nowrap"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs shadow-md shadow-orange-500/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
                     >
                       <span>{language === 'en' ? 'Open Quran Space' : 'Buka Ruang Quran'}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -356,7 +344,7 @@ export const SwipeableReviewQueue: React.FC<Props> = ({
                       {dueQuranByJuz.map(({ juz, count }) => (
                         <button
                           key={juz}
-                          onClick={() => onOpenQuranReview(juz)}
+                          onClick={() => setActiveSpace('quran')}
                           className="flex items-center justify-between p-2.5 rounded-xl bg-[#131926] border border-slate-800 hover:border-amber-500/50 hover:bg-[#1c2438] transition-all text-left group cursor-pointer shadow-2xs min-w-0"
                         >
                           <div className="min-w-0 pr-1">
@@ -432,21 +420,12 @@ export const SwipeableReviewQueue: React.FC<Props> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                    {personalStats.dueToday > 0 && (
-                      <button
-                        onClick={onOpenPersonalReview}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-white" />
-                        <span>{language === 'en' ? 'Start Review' : 'Mulai Murajaah'}</span>
-                      </button>
-                    )}
                     <button
                       onClick={() => setActiveSpace('personal')}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all cursor-pointer whitespace-nowrap"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
                     >
                       <span>{language === 'en' ? 'Open Library' : 'Buka Perpustakaan'}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -461,7 +440,7 @@ export const SwipeableReviewQueue: React.FC<Props> = ({
                       {duePersonalByBook.map(({ bookId, title, count }) => (
                         <button
                           key={bookId}
-                          onClick={onOpenPersonalReview}
+                          onClick={() => setActiveSpace('personal')}
                           className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all text-left group cursor-pointer shadow-2xs min-w-0"
                         >
                           <div className="min-w-0 pr-1 flex-1">

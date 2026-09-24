@@ -2689,7 +2689,7 @@ export const PersonalSpace: React.FC<PersonalSpaceProps> = ({
                   <input
                     type="text"
                     autoFocus
-                    placeholder={language === 'en' ? 'e.g. CLS-89AB' : 'contoh: CLS-89AB'}
+                    placeholder={language === 'en' ? 'e.g. BOOK-89AB' : 'contoh: BOOK-89AB'}
                     value={codeInputValue}
                     onChange={(e) => setCodeInputValue(e.target.value.toUpperCase())}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold tracking-wider text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase placeholder:normal-case placeholder:font-normal placeholder:tracking-normal"

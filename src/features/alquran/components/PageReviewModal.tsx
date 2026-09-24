@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { X, BookOpen, Clock, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import { X, BookOpen, Clock, ShieldCheck, AlertCircle, Loader2, Lock } from "lucide-react";
 import type { QuranPageSummary } from "../types/quran-pages.types";
 import { useReviewQuranPage } from "../hooks/useQuranPages";
+import { useApp } from "@/context/AppContext";
+import { predictQuranIntervals } from "@/lib/fsrs";
 
 interface PageReviewModalProps {
   page: QuranPageSummary | null;
@@ -9,6 +11,7 @@ interface PageReviewModalProps {
 }
 
 export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
+  const { reviewQuranPage } = useApp();
   const reviewMutation = useReviewQuranPage();
   const [selectedRating, setSelectedRating] = useState<1 | 2 | 3 | 4 | null>(null);
 
@@ -17,6 +20,9 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
   const handleReview = async (rating: 1 | 2 | 3 | 4) => {
     setSelectedRating(rating);
     try {
+      if (reviewQuranPage) {
+        reviewQuranPage(page.page_number, (rating === 4 ? 3 : rating) as 1 | 2 | 3);
+      }
       await reviewMutation.mutateAsync({
         page_number: page.page_number,
         rating,
@@ -112,7 +118,16 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
 
         {/* FSRS Rating Options */}
         {(() => {
-          const isRating3Allowed = (page.stability || 0) > 30 || page.status === "mapan";
+          const isRating3Allowed = (page.stability || 0) > 30 || page.status === "mapan" || !!page.has_reached_mapan;
+          const intervals = predictQuranIntervals({
+            stability: page.stability || 0,
+            difficulty: page.difficulty || 5.0,
+            reps: page.review_count || 0,
+            lapses: 0,
+            lastReview: page.last_reviewed_at || null,
+            nextReview: page.next_review_at || null,
+            state: 'review'
+          });
 
           return (
             <div className="space-y-2">
@@ -120,7 +135,7 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
                 Bagaimana kelancaran tilawah / hafalan halaman ini?
               </p>
 
-              <div className={`grid ${isRating3Allowed ? "grid-cols-3" : "grid-cols-2"} gap-2.5`}>
+              <div className="grid grid-cols-3 gap-2.5">
                 <button
                   disabled={reviewMutation.isPending}
                   onClick={() => handleReview(1)}
@@ -130,7 +145,7 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
                     <Loader2 className="w-4 h-4 animate-spin my-1" />
                   ) : (
                     <>
-                      <span className="text-xs font-bold font-mono">1 • Again</span>
+                      <span className="text-xs font-bold font-mono">1 • Again ({intervals.needReviewDays}h)</span>
                       <span className="text-[10px] opacity-75">Banyak Lupa</span>
                     </>
                   )}
@@ -145,13 +160,13 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
                     <Loader2 className="w-4 h-4 animate-spin my-1" />
                   ) : (
                     <>
-                      <span className="text-xs font-bold font-mono">2 • Hard</span>
+                      <span className="text-xs font-bold font-mono">2 • Hard ({intervals.hardDays}h)</span>
                       <span className="text-[10px] opacity-75">Lancar</span>
                     </>
                   )}
                 </button>
 
-                {isRating3Allowed && (
+                {isRating3Allowed ? (
                   <button
                     disabled={reviewMutation.isPending}
                     onClick={() => handleReview(3)}
@@ -161,10 +176,21 @@ export const PageReviewModal = ({ page, onClose }: PageReviewModalProps) => {
                       <Loader2 className="w-4 h-4 animate-spin my-1" />
                     ) : (
                       <>
-                        <span className="text-xs font-bold font-mono">3 • Mutqin</span>
+                        <span className="text-xs font-bold font-mono">3 • Mutqin ({intervals.goodDays}h)</span>
                         <span className="text-[10px] opacity-75">Sangat Fasih</span>
                       </>
                     )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="flex flex-col items-center justify-center p-3 rounded-xl border border-border/50 bg-surface-1/50 text-muted-foreground/60 cursor-not-allowed opacity-60 select-none"
+                    title="Terkunci: Memerlukan stabilitas > 30 hari"
+                  >
+                    <Lock className="w-3.5 h-3.5 mb-1 opacity-70" />
+                    <span className="text-xs font-bold font-mono">Mutqin</span>
+                    <span className="text-[9px] opacity-75">&gt;30 Hari</span>
                   </button>
                 )}
               </div>

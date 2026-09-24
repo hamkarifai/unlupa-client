@@ -19,9 +19,15 @@ api.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const url = error.config?.url ?? "";
-      if (!url.includes("/auth/login")) {
+      if (!url.includes("/auth/login") && !url.includes("/auth/register")) {
         useAuthStore.getState().logout();
-        window.location.href = "/login";
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login" &&
+          window.location.pathname !== "/register"
+        ) {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

@@ -259,8 +259,14 @@ export const personalService = {
     return response.data;
   },
 
-  async requestPublishBook(id: string): Promise<RequestPublishBookResponse> {
-    const response = await api.post(`/api/v1/books/${id}/request-publish`);
+  async requestPublishBook(
+    id: string,
+    payload?: { is_editable?: boolean },
+  ): Promise<RequestPublishBookResponse> {
+    const response = await api.post(
+      `/api/v1/books/${id}/request-publish`,
+      payload || { is_editable: true },
+    );
     return response.data;
   },
 

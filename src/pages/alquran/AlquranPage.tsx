@@ -1,12 +1,9 @@
-import { AppProvider } from "@/context/AppContext";
 import { QuranSpace } from "@/components/quran/QuranSpace";
 
 export const AlquranPage = () => {
   return (
-    <AppProvider>
-      <div className="min-h-screen bg-[#F8F9FA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-500 selection:text-white p-3 sm:p-5 md:p-6">
-        <QuranSpace />
-      </div>
-    </AppProvider>
+    <div className="min-h-screen bg-[#F8F9FA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-500 selection:text-white p-3 sm:p-5 md:p-6">
+      <QuranSpace />
+    </div>
   );
 };

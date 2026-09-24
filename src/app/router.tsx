@@ -23,7 +23,7 @@ import { BookDetailPage } from "@/pages/personal/BookDetailPage";
 import { ModuleDetailPage } from "@/pages/personal/ModuleDetailPage";
 import { ItemDetailPage } from "@/pages/personal/ItemDetailPage";
 import { ClassroomCardSandbox } from "@/features/classroom/pages/ClassroomSandbox";
-import { StudentDashboard } from "@/features/classroom/pages/StudentDashboard";
+import { ClassroomPage } from "@/pages/classroom/ClassroomPage";
 import { ClassroomDetailView } from "@/features/classroom/pages/ClassroomDetailView";
 import { ClassroomBookDetailView } from "@/features/classroom/pages/ClassroomBookDetailView";
 import { QuranClassJuzDetailView } from "@/features/classroom/pages/QuranClassJuzDetailView";
@@ -75,7 +75,7 @@ export const router = createBrowserRouter([
                 path: "/dashboard/pribadi/book/:bookId/item/:itemId",
                 element: <ItemDetailPage />,
               },
-              { path: "/dashboard/kelas", element: <StudentDashboard /> },
+              { path: "/dashboard/kelas", element: <ClassroomPage /> },
               { path: "/dashboard/kelas/:classroomId", element: <ClassroomDetailView /> },
               { path: "/dashboard/kelas/:classroomId/book/:bookId", element: <ClassroomBookDetailView /> },
               { path: "/dashboard/kelas/:classroomId/juz/:juzId", element: <QuranClassJuzDetailView /> },

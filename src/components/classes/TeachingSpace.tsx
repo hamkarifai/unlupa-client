@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useSwipeGesture } from '../../hooks/useSwipeGesture';
 import { ClassStudent, ClassGroup } from '../../types';
@@ -9,6 +9,7 @@ import { StudentProgressReportModal } from './StudentProgressReportModal';
 import { JuzRangeSelector } from './JuzRangeSelector';
 import { PersonalSpace } from '../personal/PersonalSpace';
 import { isDue } from '../../lib/fsrs';
+import { useAuthStore } from '@/features/auth/stores/auth.store';
 import {
   BookOpen,
   Users,
@@ -37,7 +38,9 @@ import {
   LogOut,
   Archive,
   RotateCcw,
-  Lock
+  Lock,
+  UserPlus,
+  School
 } from 'lucide-react';
 
 // Preset cover images as aesthetic alternatives
@@ -79,7 +82,7 @@ const COVER_PRESETS = {
 };
 
 const generateRandomCode = (type: 'quran' | 'non-quran') => {
-  const prefix = type === 'quran' ? 'QRN' : 'CLS';
+  const prefix = type === 'quran' ? 'QRN' : 'BOOK';
   const num = Math.floor(1000 + Math.random() * 9000);
   return `${prefix}-${num}`;
 };
@@ -133,12 +136,17 @@ const compressAndResizeImage = (file: File): Promise<string> => {
 export const TeachingSpace: React.FC = () => {
   const { 
     teachingClasses, 
+    myClasses,
+    joinClassByCode,
     createTeachingClass, 
     deleteTeachingClass, 
     closeTeachingClass,
     reopenTeachingClass,
     updateTeachingClass,
     removeStudentFromClass,
+    leaveClass,
+    fetchClasses,
+    fetchClassMembers,
     books, 
     items,
     language,
@@ -155,6 +163,15 @@ export const TeachingSpace: React.FC = () => {
     getLiveStudentBookItems
   } = useApp();
 
+  const authUser = useAuthStore((s) => s.user);
+  const isTeacher = Boolean(
+    (userProfile?.role as string) === 'teacher' || 
+    userProfile?.role === 'admin' || 
+    userProfile?.role === 'superadmin' || 
+    authUser?.role === 'teacher' || 
+    authUser?.role === 'admin'
+  );
+
   // Active Category: 'quran' | 'non-quran'
   const [activeCategory, setActiveCategory] = useState<'quran' | 'non-quran'>('quran');
   
@@ -162,9 +179,6 @@ export const TeachingSpace: React.FC = () => {
   const [bookPickerTab, setBookPickerTab] = useState<'personal' | 'imported'>('personal');
   
   // Search state
-  
-
-
   const [searchQuery, setSearchQuery] = useState('');
 
   // Drill-down navigation state
@@ -184,12 +198,17 @@ export const TeachingSpace: React.FC = () => {
 
   // Modal & UI states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [joinInputCode, setJoinInputCode] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [createdClassSuccess, setCreatedClassSuccess] = useState<ClassGroup | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // In-app confirmation states
   const [studentToRemove, setStudentToRemove] = useState<{ id: string; name: string } | null>(null);
   const [classToDelete, setClassToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [classToLeave, setClassToLeave] = useState<{ id: string; name: string } | null>(null);
   const [classToClose, setClassToClose] = useState<{ id: string; name: string } | null>(null);
 
   // Image upload state
@@ -217,13 +236,39 @@ export const TeachingSpace: React.FC = () => {
     assignedBookId: books[0]?.id || '',
   });
 
+  // Fetch latest classes from backend API on mount or role change
+  useEffect(() => {
+    void fetchClasses();
+  }, [fetchClasses]);
+
+  // Fetch class members whenever a class is selected
+  useEffect(() => {
+    if (selectedClassId) {
+      void fetchClassMembers(selectedClassId);
+    }
+  }, [selectedClassId, fetchClassMembers]);
+
+  // Combine classes based on role / enrolled list
+  const combinedClasses = useMemo(() => {
+    const classMap = new Map<string, ClassGroup>();
+    if (isTeacher) {
+      (teachingClasses || []).forEach(c => classMap.set(c.id, c));
+    }
+    (myClasses || []).forEach(c => {
+      if (!classMap.has(c.id)) {
+        classMap.set(c.id, c);
+      }
+    });
+    return Array.from(classMap.values());
+  }, [isTeacher, teachingClasses, myClasses]);
+
   // Filter classes by category & search query
-  const quranClasses = teachingClasses.filter(c => c.type === 'quran');
-  const nonQuranClasses = teachingClasses.filter(c => c.type === 'non-quran');
+  const quranClasses = combinedClasses.filter(c => c.type === 'quran');
+  const nonQuranClasses = combinedClasses.filter(c => c.type === 'non-quran');
 
   // Swipe gesture: direct horizontal navigation
   useSwipeGesture(null, {
-    disabled: isCreateOpen || isEditClassOpen || Boolean(studentToRemove) || Boolean(classToDelete) || Boolean(createdClassSuccess),
+    disabled: isCreateOpen || isJoinOpen || isEditClassOpen || Boolean(studentToRemove) || Boolean(classToDelete) || Boolean(createdClassSuccess),
     onSwipeRight: () => {
       if (inspectingStudentId) {
         setInspectingStudentId(null);
@@ -265,7 +310,13 @@ export const TeachingSpace: React.FC = () => {
       (c.description ? c.description.toLowerCase().includes((searchQuery || '').toLowerCase()) : false)
     );
 
-  const selectedClass = teachingClasses.find(c => c.id === selectedClassId) || null;
+  const selectedClass = combinedClasses.find(c => c.id === selectedClassId) || null;
+  const isClassOwner = Boolean(
+    selectedClass && (
+      (teachingClasses || []).some(tc => tc.id === selectedClass.id) ||
+      (selectedClass.teacherId && (selectedClass.teacherId === userProfile?.id || selectedClass.teacherId === authUser?.id))
+    )
+  );
   const inspectingStudent = selectedClass?.students.find(s => s.id === inspectingStudentId) || null;
 
   // High-level aggregate metrics for the 2-in-1 Stats Banner
@@ -290,16 +341,7 @@ export const TeachingSpace: React.FC = () => {
   };
 
   const handleOpenCreateModal = (typeToCreate?: 'quran' | 'non-quran') => {
-    const check = isFeatureAllowed('create_class');
-    if (!check.allowed) {
-      openUpgradeModal(
-        check.reason,
-        language === 'en'
-          ? `Free tier allows up to ${check.limit} active class. Upgrade to Unlupa Pro / Institutional to manage unlimited classes & students.`
-          : `Batas akun Free adalah maksimal ${check.limit} kelas aktif. Upgrade ke Unlupa Pro / Edu untuk membuat kelas & membina santri tanpa batas.`
-      );
-      return;
-    }
+    if (!isTeacher) return;
 
     const t = typeToCreate || activeCategory;
     setUploadError(null);
@@ -316,6 +358,27 @@ export const TeachingSpace: React.FC = () => {
     });
     setBookPickerTab(initialBook?.isReadonly ? 'imported' : 'personal');
     setIsCreateOpen(true);
+  };
+
+  const handleJoinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = joinInputCode.trim();
+    if (!cleanCode) return;
+    setIsJoining(true);
+    setJoinError(null);
+    try {
+      const res = await joinClassByCode(cleanCode);
+      if (res.success) {
+        setIsJoinOpen(false);
+        setJoinInputCode('');
+      } else {
+        setJoinError(res.message);
+      }
+    } catch (err: any) {
+      setJoinError(err.message || 'Gagal bergabung ke kelas.');
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   // Process file upload safely from device storage
@@ -440,6 +503,14 @@ export const TeachingSpace: React.FC = () => {
     setSelectedClassId(null); setIsManagingBook(false);
   };
 
+  const handleConfirmLeaveClass = () => {
+    if (!classToLeave) return;
+    leaveClass(classToLeave.id);
+    setClassToLeave(null);
+    setSelectedClassId(null);
+    setIsManagingBook(false);
+  };
+
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.name.trim()) return;
@@ -487,7 +558,7 @@ export const TeachingSpace: React.FC = () => {
       const book = books.find(b => b.id === assignedId);
       if (!book) return 'Belum ada kitab';
       const bookItems = items.filter(i => i.bookId === book.id);
-      const count = bookItems.length;
+      const count = bookItems.length || book.totalItemsCount || 0;
       return `${book.title} (${count} Materi)`;
     }
   };
@@ -551,7 +622,7 @@ export const TeachingSpace: React.FC = () => {
       // Non-Quran (Kitab / Materi)
       const assignedId = cls.assignedBookIds?.[0];
       const assignedClassBookId = assignedId ? `class-book-${cls.id}-${assignedId}` : undefined;
-      const isCurrentUser = student.email === userProfile.email || student.id === `std-user-${userProfile.id}`;
+      const isCurrentUser = Boolean(userProfile && (student.email === userProfile.email || student.id === `std-user-${userProfile.id}`));
       
       // We only care about items assigned to this specific class context.
       if (isCurrentUser && assignedClassBookId) {
@@ -663,7 +734,7 @@ export const TeachingSpace: React.FC = () => {
     } else {
       const assignedId = cls.assignedBookIds?.[0];
       const assignedClassBookId = assignedId ? `class-book-${cls.id}-${assignedId}` : undefined;
-      const isCurrentUser = student.email === userProfile.email || student.id === `std-user-${userProfile.id}`;
+      const isCurrentUser = Boolean(userProfile && (student.email === userProfile.email || student.id === `std-user-${userProfile.id}`));
       const classItems = isCurrentUser 
         ? items.filter(i => i.bookId === assignedClassBookId || i.bookId === assignedId)
         : (student.bookItemsData && student.bookItemsData.length > 0 ? student.bookItemsData : items.filter(i => i.bookId === assignedClassBookId || i.bookId === assignedId));
@@ -884,6 +955,85 @@ export const TeachingSpace: React.FC = () => {
 
   const renderSharedModals = () => (
     <>
+      {/* --------------------------------------------------------------------- */}
+      {/* MODAL: GABUNG KELAS DENGAN KODE */}
+      {/* --------------------------------------------------------------------- */}
+      {isJoinOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <School className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span>{language === 'en' ? 'Join Class' : 'Gabung Kelas'}</span>
+              </h3>
+              <button
+                onClick={() => setIsJoinOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleJoinSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  {language === 'en' ? 'Class Code' : 'Kode Kelas'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: QRN-1234 atau BOOK-5678"
+                    value={joinInputCode}
+                    onChange={(e) => setJoinInputCode(e.target.value.toUpperCase())}
+                    className="w-full uppercase font-mono tracking-widest px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">
+                  {language === 'en' 
+                    ? 'Enter the invitation code provided by your teacher/ustadz.' 
+                    : 'Masukkan kode undangan kelas yang diberikan oleh guru/ustadz pembimbing Anda.'}
+                </p>
+              </div>
+
+              {joinError && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{joinError}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsJoinOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  {language === 'en' ? 'Cancel' : 'Batal'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isJoining || !joinInputCode.trim()}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                >
+                  {isJoining ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{language === 'en' ? 'Joining...' : 'Memproses...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>{language === 'en' ? 'Join Now' : 'Gabung Sekarang'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --------------------------------------------------------------------- */}
       {/* MODAL: BUAT KELAS BARU */}
       {/* --------------------------------------------------------------------- */}
@@ -1383,6 +1533,47 @@ export const TeachingSpace: React.FC = () => {
       )}
 
       {/* --------------------------------------------------------------------- */}
+      {/* MODAL: KONFIRMASI KELUAR KELAS */}
+      {/* --------------------------------------------------------------------- */}
+      {classToLeave && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <LogOut className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {language === 'en' ? 'Leave Class?' : 'Keluar dari Kelas?'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  {language === 'en'
+                    ? `Are you sure you want to leave ${classToLeave.name}? You will no longer be listed in this class.`
+                    : `Apakah Anda yakin ingin keluar dari kelas ${classToLeave.name}? Anda tidak akan terdaftar lagi di kelas ini.`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setClassToLeave(null)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+              >
+                {language === 'en' ? 'Cancel' : 'Batal'}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLeaveClass}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer shadow-xs"
+              >
+                {language === 'en' ? 'Leave Class' : 'Keluar Kelas'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --------------------------------------------------------------------- */}
       {/* MODAL: LAPORAN PERKEMBANGAN & EVALUASI SANTRI */}
       {/* --------------------------------------------------------------------- */}
       {reportStudent && (
@@ -1435,7 +1626,7 @@ export const TeachingSpace: React.FC = () => {
 
     const allStudents = (selectedClass.students || []).map(std => {
       // Avoid overwriting the current teacher's own items if they view themselves in their own class
-      const isCurrentUser = std.id === userProfile.id;
+      const isCurrentUser = Boolean(userProfile && std.id === userProfile.id);
       if (isCurrentUser) return std;
 
       if (isQuran) {
@@ -1513,49 +1704,71 @@ export const TeachingSpace: React.FC = () => {
 
           {/* Action Icons */}
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => handleOpenEditClass(selectedClass)}
-              className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Edit Info Kelas"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
+            {isClassOwner ? (
+              <>
+                <button
+                  onClick={() => handleOpenEditClass(selectedClass)}
+                  className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title="Edit Info Kelas"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
 
-            <button
-              onClick={() => handleShareWhatsApp(selectedClass.code, selectedClass.name)}
-              className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Bagikan ke WhatsApp"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
+                <button
+                  onClick={() => handleShareWhatsApp(selectedClass.code, selectedClass.name)}
+                  className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title="Bagikan ke WhatsApp"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
 
-            {selectedClass.status === 'closed' ? (
-              <button
-                type="button"
-                onClick={() => reopenTeachingClass?.(selectedClass.id)}
-                className="w-8.5 h-8.5 rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
-                title="Buka Kembali Kelas"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+                {selectedClass.status === 'closed' ? (
+                  <button
+                    type="button"
+                    onClick={() => reopenTeachingClass?.(selectedClass.id)}
+                    className="w-8.5 h-8.5 rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                    title="Buka Kembali Kelas"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setClassToClose({ id: selectedClass.id, name: selectedClass.name })}
+                    className="w-8.5 h-8.5 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                    title="Tutup Kelas (Selesaikan & Bersihkan Buku Santri)"
+                  >
+                    <Archive className="w-4 h-4" />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setClassToDelete({ id: selectedClass.id, name: selectedClass.name })}
+                  className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title="Hapus Kelas"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
             ) : (
-              <button
-                type="button"
-                onClick={() => setClassToClose({ id: selectedClass.id, name: selectedClass.name })}
-                className="w-8.5 h-8.5 rounded-xl border border-amber-200 dark:border-amber-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
-                title="Tutup Kelas (Selesaikan & Bersihkan Buku Santri)"
-              >
-                <Archive className="w-4 h-4" />
-              </button>
-            )}
+              <>
+                <button
+                  onClick={() => handleShareWhatsApp(selectedClass.code, selectedClass.name)}
+                  className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title="Bagikan ke WhatsApp"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
 
-            <button
-              onClick={() => setClassToDelete({ id: selectedClass.id, name: selectedClass.name })}
-              className="w-8.5 h-8.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Hapus Kelas"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+                <button
+                  onClick={() => setClassToLeave({ id: selectedClass.id, name: selectedClass.name })}
+                  className="w-8.5 h-8.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-white dark:bg-slate-800 text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title={language === 'en' ? 'Leave Class' : 'Keluar dari Kelas'}
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -1601,7 +1814,7 @@ export const TeachingSpace: React.FC = () => {
                       <span>{language === 'en' ? 'Closed (Archived)' : 'Kelas Ditutup / Selesai'}</span>
                     </span>
                   )}
-                  {assignedBook && (
+                  {isClassOwner && assignedBook && (
                     <button
                       onClick={() => {
                         
@@ -1857,17 +2070,19 @@ export const TeachingSpace: React.FC = () => {
                       <Share2 className="w-4 h-4" />
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteStudent(student.id, student.name);
-                      }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/50 transition-colors cursor-pointer shrink-0"
-                      title={`Keluarkan ${student.name} dari daftar santri kelas`}
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </button>
+                    {isClassOwner && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteStudent(student.id, student.name);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/50 transition-colors cursor-pointer shrink-0"
+                        title={`Keluarkan ${student.name} dari daftar santri kelas`}
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    )}
 
                     <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
                   </div>
@@ -1964,14 +2179,29 @@ export const TeachingSpace: React.FC = () => {
             />
           </div>
 
-          {/* Create Class Button */}
+          {/* Join Class Button - for everyone/students */}
           <button
-            onClick={() => handleOpenCreateModal(activeCategory)}
-            className="h-8.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer shrink-0"
+            onClick={() => {
+              setJoinError(null);
+              setJoinInputCode('');
+              setIsJoinOpen(true);
+            }}
+            className="h-8.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer shrink-0"
           >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{language === 'en' ? 'Create' : 'Tambah'}</span>
+            <UserPlus className="w-4 h-4" />
+            <span className="hidden sm:inline">{language === 'en' ? 'Join Class' : 'Gabung'}</span>
           </button>
+
+          {/* Create Class Button - Teacher only */}
+          {isTeacher && (
+            <button
+              onClick={() => handleOpenCreateModal(activeCategory)}
+              className="h-8.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">{language === 'en' ? 'Create' : 'Tambah'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1983,17 +2213,36 @@ export const TeachingSpace: React.FC = () => {
             {language === 'en' ? 'No Classes Found' : 'Belum Ada Kelas'}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 max-w-sm mx-auto">
-            {activeCategory === 'quran'
-              ? 'Buat halaqah Al-Qur\'an untuk membagikan kode kelas dan memantau setoran santri.'
-              : 'Buat kelas kitab/materi untuk memantau pemahaman dan penguasaan kartu santri.'}
+            {isTeacher ? (
+              activeCategory === 'quran'
+                ? 'Buat halaqah Al-Qur\'an untuk membagikan kode kelas dan memantau setoran santri.'
+                : 'Buat kelas kitab/materi untuk memantau pemahaman dan penguasaan kartu santri.'
+            ) : (
+              'Belum ada kelas yang Anda ikuti saat ini. Masukkan kode kelas dari guru/ustadz untuk bergabung.'
+            )}
           </p>
-          <button
-            onClick={() => handleOpenCreateModal(activeCategory)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>{language === 'en' ? 'Create New Class' : 'Buat Kelas Sekarang'}</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              onClick={() => {
+                setJoinError(null);
+                setJoinInputCode('');
+                setIsJoinOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>{language === 'en' ? 'Join Class with Code' : 'Gabung Kelas dengan Kode'}</span>
+            </button>
+            {isTeacher && (
+              <button
+                onClick={() => handleOpenCreateModal(activeCategory)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>{language === 'en' ? 'Create New Class' : 'Buat Kelas Sekarang'}</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3 mt-2">
@@ -2006,7 +2255,7 @@ export const TeachingSpace: React.FC = () => {
             const assignedId = cls.assignedBookIds?.[0];
             const book = books.find(b => b.id === assignedId);
             const bookItems = items.filter(i => i.bookId === assignedId);
-            const totalItemsCount = bookItems.length;
+            const totalItemsCount = bookItems.length || book?.totalItemsCount || 0;
 
             // Review status description
             let reviewStatusText = '';

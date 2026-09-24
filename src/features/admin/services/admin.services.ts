@@ -28,4 +28,13 @@ export const adminService = {
     const response = await api.post(`/api/v1/admin/books/${bookId}/reject`);
     return response.data as { status: number; message: string; data: Book };
   },
+
+  /**
+   * Delete a published book from library (Admin only).
+   * @param bookId ID of the published book to delete.
+   */
+  async deletePublishedBook(bookId: string) {
+    const response = await api.delete(`/api/v1/admin/books/${bookId}`);
+    return response.data as { status: number; message: string };
+  },
 };

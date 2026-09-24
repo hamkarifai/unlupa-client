@@ -44,7 +44,11 @@ export const useLogin = () => {
       setView("success");
 
       timeoutRef.current = setTimeout(() => {
-        navigate("/dashboard");
+        if (user.role === "teacher") {
+          navigate("/dashboard/kelas");
+        } else {
+          navigate("/dashboard");
+        }
         toast.success(`Berhasil masuk. Selamat datang kembali, ${user.name}!`, {
           duration: 4000,
         });

@@ -7,11 +7,10 @@ import {
   Check, 
   ShieldCheck, 
   Pencil, 
-  Globe, 
-  Tag, 
   Layers, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
 interface PublishModalProps {
@@ -26,11 +25,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
   
   // Authenticity & Edit Permission: Default to FALSE (Hanya Baca / Otentik) for protection
   const [allowEdit, setAllowEdit] = useState(false);
-  
-  // Pricing Foundation: Free vs Paid
-  const [isPaid, setIsPaid] = useState(false);
-  const [price, setPrice] = useState<number>(25000);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   // Filter ONLY personal original works (never someone else's imported read-only book)
@@ -46,6 +41,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
         setSelectedBookId(firstUnpublished?.id || myBooks[0].id);
       }
       setStatus(null);
+      setIsSubmitting(false);
     }
   }, [isOpen, preselectedBookId]);
 
@@ -56,27 +52,33 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
   const isSelectedAlreadyPublished = selectedBook ? library.some(l => l.book.id === selectedBook.id) : false;
 
   const handlePublish = async () => {
-    if (!selectedBookId || isSelectedAlreadyPublished) return;
+    if (!selectedBookId || isSelectedAlreadyPublished || isSubmitting) return;
     
-    const result = await publishBookToLibrary(selectedBookId, allowEdit, {
-      isPaid,
-      price: isPaid ? price : 0
-    });
+    setIsSubmitting(true);
+    setStatus(null);
 
-    setStatus({ type: result.success ? 'success' : 'error', msg: result.message });
-    if (result.success) {
-      setTimeout(() => {
-        onClose();
-        setStatus(null);
-      }, 1600);
+    try {
+      const result = await publishBookToLibrary(selectedBookId, allowEdit);
+      setStatus({ type: result.success ? 'success' : 'error', msg: result.message });
+      if (result.success) {
+        setTimeout(() => {
+          onClose();
+          setStatus(null);
+        }, 1600);
+      }
+    } catch (err: any) {
+      setStatus({
+        type: 'error',
+        msg: err?.message || (language === 'en' ? 'Failed to publish book' : 'Gagal mempublikasikan kitab')
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const presetPrices = [15000, 25000, 50000, 100000];
-
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
           <div className="flex items-center gap-2.5">
@@ -96,7 +98,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
           </div>
           <button 
             onClick={onClose} 
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -119,7 +121,7 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
             </div>
           )}
 
-          {/* 1. Pemilihan Karya Pribadi (Visual Card Layout matching TeachingSpace) */}
+          {/* 1. Pemilihan Karya Pribadi */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -297,133 +299,13 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
             </div>
           </div>
 
-          {/* 3. Asas & Model Distribusi: Gratis (Free Public) vs Berbayar (Karya Premium / Dijual) */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                {language === 'en' ? 'Pricing & Distribution Model' : 'Model Distribusi & Penetapan Harga'}
-              </label>
-              <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                Asas Komersial & Publik
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* Option A: Free Public */}
-              <div
-                onClick={() => setIsPaid(false)}
-                className={`p-3 rounded-2xl border cursor-pointer transition-all ${
-                  !isPaid
-                    ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 ring-1 ring-indigo-500/20'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`p-1.5 rounded-lg ${!isPaid ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-                    <Globe className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-bold text-slate-900 dark:text-white">
-                      {language === 'en' ? 'Free (Public Domain)' : 'Gratis (Free Public)'}
-                    </h5>
-                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                      Amal Jariah / Ilmu Terbuka
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
-                  {language === 'en'
-                    ? 'Anyone can freely download & import this book into their review library.'
-                    : 'Dapat diunduh dan dipelajari dengan cuma-cuma oleh seluruh komunitas penuntut ilmu.'}
-                </p>
-              </div>
-
-              {/* Option B: Paid / Commercial */}
-              <div
-                onClick={() => setIsPaid(true)}
-                className={`p-3 rounded-2xl border cursor-pointer transition-all ${
-                  isPaid
-                    ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 ring-1 ring-amber-500/20'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`p-1.5 rounded-lg ${isPaid ? 'bg-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-                    <Tag className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-bold text-slate-900 dark:text-white">
-                      {language === 'en' ? 'Paid / Premium' : 'Berbayar (Dijual / Premium)'}
-                    </h5>
-                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                      Monetisasi Karya
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
-                  {language === 'en'
-                    ? 'Readers purchase the book license to import it into their private space.'
-                    : 'Penikmat karya membeli lisensi materi untuk dapat mengimpor ke akun belajar mereka.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Paid Price Setting Form */}
-            {isPaid && (
-              <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 space-y-2.5 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                    {language === 'en' ? 'Set Price (IDR)' : 'Tetapkan Harga Jual (Rupiah)'}
-                  </label>
-                  <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300">
-                    Rp {price.toLocaleString('id-ID')}
-                  </span>
-                </div>
-
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-700 dark:text-amber-400">
-                    Rp
-                  </span>
-                  <input
-                    type="number"
-                    min={5000}
-                    step={5000}
-                    value={price}
-                    onChange={e => setPrice(Math.max(0, Number(e.target.value)))}
-                    placeholder="25000"
-                    className="w-full pl-11 pr-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                  <span className="text-[10px] text-amber-800 dark:text-amber-400 font-medium mr-1">
-                    Preset:
-                  </span>
-                  {presetPrices.map(preset => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setPrice(preset)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
-                        price === preset
-                          ? 'bg-amber-600 text-white shadow-2xs'
-                          : 'bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100/50'
-                      }`}
-                    >
-                      Rp {preset.toLocaleString('id-ID')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Action Buttons */}
           <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
             >
               {language === 'en' ? 'Cancel' : 'Batal'}
             </button>
@@ -431,17 +313,24 @@ export const PublishModal: React.FC<PublishModalProps> = ({ isOpen, onClose, pre
             <button
               type="button"
               onClick={handlePublish}
-              disabled={!selectedBookId || isSelectedAlreadyPublished}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              disabled={!selectedBookId || isSelectedAlreadyPublished || isSubmitting}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-95"
             >
-              <Share2 className="w-4 h-4" />
-              <span>
-                {isSelectedAlreadyPublished
-                  ? (language === 'en' ? 'Already in Library' : 'Sudah Ada di Pustaka')
-                  : isPaid
-                  ? (language === 'en' ? `Publish (Rp ${price.toLocaleString('id-ID')})` : `Publikasikan (Rp ${price.toLocaleString('id-ID')})`)
-                  : (language === 'en' ? 'Publish for Free' : 'Publikasikan Gratis')}
-              </span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{language === 'en' ? 'Publishing...' : 'Mempublikasikan...'}</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  <span>
+                    {isSelectedAlreadyPublished
+                      ? (language === 'en' ? 'Already in Library' : 'Sudah Ada di Pustaka')
+                      : (language === 'en' ? 'Publish to Library' : 'Publikasikan ke Pustaka')}
+                  </span>
+                </>
+              )}
             </button>
           </div>
         </div>

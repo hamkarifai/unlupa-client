@@ -10,7 +10,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { SwipeableReviewQueue } from './SwipeableReviewQueue';
 import { VisualReviewCalendar } from './VisualReviewCalendar';
 import { ConsistencyJourneyWidget } from './ConsistencyJourneyWidget';
 import { WeeklyStreakWidget } from './WeeklyStreakWidget';
@@ -19,9 +18,7 @@ import { QuickActionsBar } from './QuickActionsBar';
 import { StudentReportModal } from './StudentReportModal';
 import { AchievementReportModal } from '../common/AchievementReportModal';
 import { QuranAttendanceModal } from '../attendance/QuranAttendanceModal';
-import { QuranReviewModal } from '../quran/QuranReviewModal';
 import { MushafPageViewerModal } from '../quran/MushafPageViewerModal';
-import { PersonalReviewModal } from '../personal/PersonalReviewModal';
 
 import { useAuthStore } from '@/features/auth/stores/auth.store';
 
@@ -63,13 +60,6 @@ export const HomeSpace: React.FC = () => {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isAchievementModalOpen, setIsAchievementModalOpen] = useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
-  
-  // Review Modal States
-  const [quranReviewConfig, setQuranReviewConfig] = useState<{ isOpen: boolean; juzFilter: number | null }>({
-    isOpen: false,
-    juzFilter: null
-  });
-  const [isPersonalReviewOpen, setIsPersonalReviewOpen] = useState(false);
   const [previewPageNumber, setPreviewPageNumber] = useState<number | null>(null);
 
   // Computed data
@@ -164,22 +154,13 @@ export const HomeSpace: React.FC = () => {
       {/* 1.5 WEEKLY STREAK WIDGET */}
       <WeeklyStreakWidget />
 
-      {/* 2. SWIPEABLE UNIFIED REVIEW QUEUE CARD (AL-QUR'AN, PRIBADI, KELAS, RUANG GURU) */}
-      <SwipeableReviewQueue
-        onOpenQuranReview={(juz) => setQuranReviewConfig({ isOpen: true, juzFilter: juz || null })}
-        onOpenPersonalReview={() => setIsPersonalReviewOpen(true)}
-      />
-
       {/* 3. VISUAL PLANNED REVIEW & RETENTION CALENDAR */}
       <VisualReviewCalendar
-        onOpenQuranReview={(juz) => setQuranReviewConfig({ isOpen: true, juzFilter: juz || null })}
-        onOpenPersonalReview={() => setIsPersonalReviewOpen(true)}
         onOpenMushafViewer={(page) => setPreviewPageNumber(page)}
       />
 
       {/* 4. WEAK SPOTS & TAJWID FOCUS SECTION */}
       <WeakSpotsWidget
-        onOpenQuranReview={(juz) => setQuranReviewConfig({ isOpen: true, juzFilter: juz || null })}
         onOpenMushafViewer={(page) => setPreviewPageNumber(page)}
       />
 
@@ -222,22 +203,10 @@ export const HomeSpace: React.FC = () => {
         language={language}
       />
 
-      <QuranReviewModal
-        isOpen={quranReviewConfig.isOpen}
-        onClose={() => setQuranReviewConfig({ isOpen: false, juzFilter: null })}
-        juzFilter={quranReviewConfig.juzFilter}
-        onSelectNextJuz={(nextJuz) => setQuranReviewConfig({ isOpen: true, juzFilter: nextJuz })}
-      />
-
       <MushafPageViewerModal
         isOpen={previewPageNumber !== null}
         onClose={() => setPreviewPageNumber(null)}
         pageNumber={previewPageNumber || 1}
-      />
-
-      <PersonalReviewModal
-        isOpen={isPersonalReviewOpen}
-        onClose={() => setIsPersonalReviewOpen(false)}
       />
 
     </div>

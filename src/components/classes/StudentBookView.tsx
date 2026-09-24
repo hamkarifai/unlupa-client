@@ -20,7 +20,7 @@ export const StudentBookView: React.FC<StudentBookViewProps> = ({ student, class
   const assignedBook = parentContext.books.find(b => b.id === assignedBookId) || parentContext.books[0];
 
   const studentContext = useMemo(() => {
-    const isCurrentUser = student.quranSpaceCode === parentContext.quranSpaceCode || student.id === `std-user-${parentContext.userProfile.id}`;
+    const isCurrentUser = student.quranSpaceCode === parentContext.quranSpaceCode || Boolean(parentContext.userProfile && student.id === `std-user-${parentContext.userProfile.id}`);
     
     const classBookId = `class-book-${classGroup.id}-${assignedBookId}`;
     const directClassItems = parentContext.items.filter(i => i.bookId === classBookId);
@@ -175,7 +175,7 @@ export const StudentBookView: React.FC<StudentBookViewProps> = ({ student, class
                 studentName: student.name,
                 studentId: student.quranSpaceCode || student.id,
                 className: classGroup.name,
-                teacherName: parentContext.userProfile.fullName,
+                teacherName: parentContext.userProfile?.fullName || 'Pengajar',
                 date: new Date().toISOString()
               };
               const encoded = btoa(encodeURIComponent(JSON.stringify(reportData)));

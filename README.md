@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# Unlupa Client (Frontend Web Application)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend modern untuk platform **Unlupa (Hifzhun)** yang dibangun dengan **React 19**, **TypeScript**, **Vite**, dan **TailwindCSS v4**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠 Tech Stack
 
-## React Compiler
+- **Framework**: React 19 (`react`, `react-dom`)
+- **Language**: TypeScript (`typescript`)
+- **Build Tool**: Vite (`vite`)
+- **Styling**: TailwindCSS v4 (`tailwindcss`, `@tailwindcss/vite`)
+- **Routing**: React Router v7 (`react-router`, `react-router-dom`)
+- **Server State & Data Fetching**: TanStack React Query v5 (`@tanstack/react-query`)
+- **Global Client State**: Zustand (`zustand`)
+- **Icons**: Lucide React (`lucide-react`)
+- **Animations & Interaction**: Framer Motion (`framer-motion`, `motion`)
+- **Toast Notifications**: Sonner (`sonner`)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 📂 Struktur Direktori
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+unlupa-client/
+├── src/
+│   ├── app/                # Router configuration & App Providers
+│   ├── components/         # Reusable UI & Space Components
+│   │   ├── classes/        # Teaching Space, Student Progress Inspection
+│   │   ├── home/           # Dashboard & Beranda Space
+│   │   ├── personal/       # Personal Books & Modules Space
+│   │   ├── quran/          # Quran Space, Mushaf Viewer, Juz Tracker
+│   │   └── ui/             # Sidebar, Header, Modals, Badges
+│   ├── context/            # AppContext & Combined Providers
+│   ├── features/           # Feature Modules (Auth, Al-Quran, Classroom, Dashboard)
+│   │   ├── alquran/        # Quran Catalog Hooks, Services, Types
+│   │   ├── auth/           # Login, Register, Auth Store
+│   │   ├── classroom/      # Classroom Pages, Hooks, Services
+│   │   └── dashboard/      # Admin & Teacher Management Views
+│   ├── lib/                # FSRS Memory Engine, Offline Storage, Audio Service
+│   ├── pages/              # Routed Page Views
+│   └── types/              # Global TypeScript Definitions
+├── public/                 # Static Assets, Icons, Audio
+├── index.html              # HTML Shell Template
+├── package.json            # Node Dependencies & Scripts
+├── tailwind.config.ts      # Tailwind Styling Config
+└── vite.config.ts          # Vite Bundler Config
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🚀 Cara Menjalankan
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Prasyarat
+- Node.js versi `v20.x` atau `v22.x`.
+- npm atau bun terpasang.
+
+### 2. Konfigurasi Environment (`.env`)
+Salin atau buat file `.env` di dalam folder `unlupa-client/`:
+
+```env
+VITE_API_BASE_URL=http://localhost:3000
 ```
+
+### 3. Install Dependensi
+```bash
+npm install
+# atau
+bun install
+```
+
+### 4. Jalankan Development Server
+```bash
+npm run dev
+```
+Aplikasi web akan dapat diakses di browser pada alamat:
+👉 `http://localhost:5173`
+
+---
+
+## 📦 Skrip yang Tersedia
+
+| Command | Deskripsi |
+|---|---|
+| `npm run dev` | Menjalankan server pengembangan lokal (Vite HMR) |
+| `npm run build` | Melakukan kompilasi TypeScript (`tsc -b`) dan build produksi |
+| `npm run preview` | Menjalankan pratinjau hasil build produksi secara lokal |
+| `npm run lint` | Menjalankan ESLint untuk mengecek kualitas kode |
+
+---
+
+## 🌐 Alur Penggunaan Utama
+
+1. **Autentikasi**:
+   - Santri login $\rightarrow$ diarahkan ke `/dashboard` (atau `/dashboard/alquran`).
+   - Guru login $\rightarrow$ otomatis diarahkan langsung ke `/dashboard/kelas`.
+2. **Ruang Al-Qur'an (`/dashboard/alquran`)**:
+   - Memilih Juz 1–30, mengaktifkan halaman hafalan baru.
+   - Melakukan murajaah harian (*Daily Review*) dengan penilaian 1–4 FSRS.
+   - Memutar dan merekam tasmi' hafalan mandiri.
+3. **Ruang Kelas Guru (`/dashboard/kelas`)**:
+   - Membuat kelas baru dan membagikan kode 6 digit ke santri.
+   - Klik santri untuk masuk ke mode inspeksi (*Teacher Report / Progress View*) dalam mode *read-only*.
