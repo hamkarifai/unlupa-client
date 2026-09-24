@@ -129,7 +129,7 @@ export const DashboardLayout: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate(userRole === "teacher" ? "/dashboard/kelas" : "/dashboard")}
               className="flex items-center gap-2.5 text-left group cursor-pointer"
             >
               <div className="w-8 h-8 rounded-lg bg-[#121315] border border-[#2A2B2E] flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-105 transition-transform overflow-hidden relative">

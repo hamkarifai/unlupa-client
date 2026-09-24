@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LibraryEntry } from '../../data/sampleBooks';
+import { Chapter, BookItem, createInitialFSRSState } from '../../types';
+import { personalService } from '@/features/personal/services/personal.services';
+import { adminService } from '@/features/admin/services/admin.services';
 import { BilingualCardText } from '../common/BilingualCardText';
 import { 
   X, 
@@ -21,7 +24,9 @@ import {
   SlidersHorizontal,
   Check,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  Trash2
 } from 'lucide-react';
 
 interface Props {
@@ -38,7 +43,9 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
     language, 
     setActiveSpace,
     isBookPurchased,
-    openCheckoutModal
+    openCheckoutModal,
+    userProfile,
+    fetchPublishedLibrary
   } = useApp();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -46,6 +53,102 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [previewEntry, setPreviewEntry] = useState<LibraryEntry | null>(null);
   const [previewSelectedChapterId, setPreviewSelectedChapterId] = useState<string | null>(null);
   const [justImportedId, setJustImportedId] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'superadmin';
+
+  const handleDeletePublishedBook = async (bookId: string, title: string) => {
+    const msg = language === 'en'
+      ? `Are you sure you want to remove "${title}" from the public library?`
+      : `Apakah Anda yakin ingin menghapus kitab "${title}" dari pustaka publik?`;
+    if (!window.confirm(msg)) return;
+
+    try {
+      await adminService.deletePublishedBook(bookId);
+      await fetchPublishedLibrary();
+      if (previewEntry?.book?.id === bookId) {
+        setPreviewEntry(null);
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Gagal menghapus kitab');
+    }
+  };
+
+  // Load preview book details and tree dynamically from backend API if empty
+  useEffect(() => {
+    if (previewEntry && (!previewEntry.items || previewEntry.items.length === 0) && previewEntry.book?.id) {
+      setIsLoadingPreview(true);
+      personalService.getBookTree(previewEntry.book.id)
+        .then(res => {
+          if (res?.data) {
+            const tree = res.data;
+            const chaptersList: Chapter[] = [];
+            const itemsList: BookItem[] = [];
+
+            if (Array.isArray(tree.items)) {
+              tree.items.forEach((item: any) => {
+                itemsList.push({
+                  id: item.id,
+                  bookId: tree.book_id || previewEntry.book.id,
+                  chapterId: '',
+                  question: item.question || item.content || item.title || '',
+                  answer: item.answer || '',
+                  tags: item.tags || [],
+                  isActive: false,
+                  status: 'inactive',
+                  fsrsData: createInitialFSRSState(),
+                  createdAt: new Date().toISOString(),
+                });
+              });
+            }
+
+            const flattenModules = (mods: any[], parentId: string | null = null) => {
+              mods.forEach(mod => {
+                chaptersList.push({
+                  id: mod.id,
+                  bookId: tree.book_id || previewEntry.book.id,
+                  parentId,
+                  title: mod.title,
+                  description: mod.description,
+                  order: mod.order || 1,
+                });
+                if (Array.isArray(mod.items)) {
+                  mod.items.forEach((item: any) => {
+                    itemsList.push({
+                      id: item.id,
+                      bookId: tree.book_id || previewEntry.book.id,
+                      chapterId: mod.id,
+                      question: item.question || item.content || item.title || '',
+                      answer: item.answer || '',
+                      tags: item.tags || [],
+                      isActive: false,
+                      status: 'inactive',
+                      fsrsData: createInitialFSRSState(),
+                      createdAt: new Date().toISOString(),
+                    });
+                  });
+                }
+                if (Array.isArray(mod.children) && mod.children.length > 0) {
+                  flattenModules(mod.children, mod.id);
+                }
+              });
+            };
+
+            if (Array.isArray(tree.modules)) {
+              flattenModules(tree.modules);
+            }
+
+            setPreviewEntry(prev => prev ? { ...prev, chapters: chaptersList, items: itemsList } : null);
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to load preview tree:', err);
+        })
+        .finally(() => {
+          setIsLoadingPreview(false);
+        });
+    }
+  }, [previewEntry?.id]);
 
   if (!isOpen) return null;
 
@@ -85,8 +188,8 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
       return 0;
     });
 
-  const handleImport = (entry: LibraryEntry) => {
-    importFromLibrary(entry.id);
+  const handleImport = async (entry: LibraryEntry) => {
+    await importFromLibrary(entry.id);
     setJustImportedId(entry.id);
     setTimeout(() => {
       setJustImportedId(null);
@@ -304,17 +407,29 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
                     {/* Bottom Action Footer */}
                     <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreviewEntry(entry);
-                          setPreviewSelectedChapterId(null);
-                        }}
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{language === 'en' ? 'Preview' : 'Intip Isi'}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewEntry(entry);
+                            setPreviewSelectedChapterId(null);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{language === 'en' ? 'Preview' : 'Intip Isi'}</span>
+                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePublishedBook(entry.book.id, entry.book.title)}
+                            className="p-1.5 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                            title={language === 'en' ? 'Delete from library (Admin)' : 'Hapus dari pustaka (Admin)'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
 
                       {isJustImported ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-in fade-in">
@@ -452,54 +567,80 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     <span>{language === 'en' ? 'Sample Flashcards' : 'Sampel Kartu Q&A'} ({selectedPreviewChapterCards.length})</span>
                   </h5>
 
-                  <div className="space-y-2.5">
-                    {selectedPreviewChapterCards.map((card, idx) => (
-                      <div
-                        key={card.id || idx}
-                        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-2"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                            Q
-                          </span>
-                          <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-relaxed flex-1">
-                            <BilingualCardText text={card.question} />
-                          </div>
+                  {isLoadingPreview ? (
+                    <div className="flex items-center justify-center py-10 gap-2 text-slate-400 text-xs">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                      <span>{language === 'en' ? 'Loading book content...' : 'Memuat isi materi kitab...'}</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {selectedPreviewChapterCards.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                          {language === 'en' ? 'No cards available in this chapter yet.' : 'Belum ada kartu hafalan di bab ini.'}
                         </div>
-
-                        <div className="flex items-start gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                          <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                            A
-                          </span>
-                          <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
-                            <BilingualCardText text={card.answer} />
-                          </div>
-                        </div>
-
-                        {card.tags && card.tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 pt-1">
-                            {card.tags.map((tag, tIdx) => (
-                              <span key={tIdx} className="px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400 text-[10px] font-medium">
-                                #{tag}
+                      ) : (
+                        selectedPreviewChapterCards.map((card, idx) => (
+                          <div
+                            key={card.id || idx}
+                            className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-2"
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                Q
                               </span>
-                            ))}
+                              <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-relaxed flex-1">
+                                <BilingualCardText text={card.question} />
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                              <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                A
+                              </span>
+                              <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
+                                <BilingualCardText text={card.answer} />
+                              </div>
+                            </div>
+
+                            {card.tags && card.tags.length > 0 && (
+                              <div className="flex items-center gap-1.5 pt-1">
+                                {card.tags.map((tag, tIdx) => (
+                                  <span key={tIdx} className="px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400 text-[10px] font-medium">
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Preview Footer Action */}
               <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPreviewEntry(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  {language === 'en' ? 'Close Preview' : 'Tutup Pratinjau'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewEntry(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    {language === 'en' ? 'Close Preview' : 'Tutup Pratinjau'}
+                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePublishedBook(previewEntry.book.id, previewEntry.book.title)}
+                      className="px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                      title={language === 'en' ? 'Delete from library (Admin)' : 'Hapus dari pustaka (Admin)'}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{language === 'en' ? 'Delete' : 'Hapus'}</span>
+                    </button>
+                  )}
+                </div>
 
                 {!isBookPurchased(previewEntry.id, previewEntry.book) && (previewEntry.book.price || 0) > 0 ? (
                   <button

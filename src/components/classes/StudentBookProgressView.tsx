@@ -120,7 +120,7 @@ export const StudentBookProgressView: React.FC<StudentBookProgressViewProps> = (
                 {student.name}
               </h2>
               <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
-                {student.quranSpaceCode || 'ID: ' + student.id.slice(-4)}
+                {student.quranSpaceCode || 'ID: ' + String(student.id).slice(-4)}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">

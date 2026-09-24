@@ -20,6 +20,7 @@ import { UnifiedDueCard, DueFilterPill } from '../common/UnifiedDueCard';
 import { getJuzOfflineStatus, cacheJuzOffline } from '../../lib/offlineStorage';
 import { useQuranCatalog } from '@/features/alquran/hooks/useQuranCatalog';
 import { quranPageService } from '@/features/alquran/services/quranPage.service';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Eye, FileText, MessageSquare, 
   Search, 
@@ -74,15 +75,20 @@ export const QuranSpace: React.FC = () => {
     setActiveSpace,
     spaceResetCounter,
     isFeatureAllowed,
-    openUpgradeModal
+    openUpgradeModal,
+    inspectingStudentId,
+    isReadOnlyMode,
+    isTeacherMode
   } = useApp();
+
+  const isReadOnly = Boolean(isReadOnlyMode || (isTeacherMode && inspectingStudentId));
 
   // Navigation state between Screen 1 (Dashboard) and Screen 2 (Juz Page List)
   const [selectedJuzNumber, setSelectedJuzNumber] = useState<number | null>(null);
   const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'due' | 'active' | 'mapan'>('all');
   const [viewDensity, setViewDensity] = useState<'grid' | 'compact'>('grid');
 
-  // Live Database Hook via useQuranCatalog
+  // Live Database Hook via useQuranCatalog (supports querying inspectingStudentId for teacher)
   const {
     juzList,
     isJuzListLoading,
@@ -92,9 +98,10 @@ export const QuranSpace: React.FC = () => {
     refetchPages,
     activatePage,
     isActivating
-  } = useQuranCatalog(selectedJuzNumber);
+  } = useQuranCatalog(selectedJuzNumber, inspectingStudentId);
 
   const handleTogglePageActive = async (pageNumber: number) => {
+    if (isReadOnly) return;
     const target = displayedCatalogPages.find(p => p.pageNumber === pageNumber);
     if (!target) return;
     if (target.isActive) {
@@ -219,28 +226,43 @@ export const QuranSpace: React.FC = () => {
     active: { en: 'Active', id: 'Aktif', ar: 'نشط' }
   };
 
+  const queryClient = useQueryClient();
+
   const effectiveJuzList = useMemo(() => {
-    if (juzList && juzList.length > 0) {
-      return juzList.map(j => ({
-        juzNumber: j.juz_number,
-        nameAr: j.name_ar,
-        nameEn: j.name_en,
-        startPage: j.start_page,
-        endPage: j.end_page,
-        totalPages: j.total_pages,
-        surahSpan: j.surah_span || `${j.start_surah} - ${j.end_surah}`,
-        ayahSpan: j.ayah_span,
-        activeCount: j.active_pages,
-        masteredCount: j.mastered_pages,
-        dueCount: j.due_today,
-      }));
-    }
-    return JUZ_LIST.map(j => {
-      const activeCount = quranPages.filter(p => p.juzNumber === j.juzNumber && p.isActive).length;
-      const dueCount = quranPages.filter(p => p.juzNumber === j.juzNumber && isDue(p.fsrsData.nextReview, p.isActive)).length;
-      const masteredCount = quranPages.filter(p => p.juzNumber === j.juzNumber && pageHasMapan(p)).length;
+    return (juzList && juzList.length > 0 ? juzList : JUZ_LIST).map(j => {
+      const juzNum = 'juz_number' in j ? (j as any).juz_number : (j as any).juzNumber;
+      const pagesInJuz = quranPages.filter(p => p.juzNumber === juzNum);
+      const activePagesInJuz = pagesInJuz.filter(p => p.isActive);
+
+      const hasBackendData = juzList && juzList.length > 0 && 'active_pages' in j;
+
+      const activeCount = hasBackendData
+        ? (j as any).active_pages
+        : activePagesInJuz.length;
+      const dueCount = hasBackendData
+        ? (j as any).due_today
+        : activePagesInJuz.filter(p => isDue(p.fsrsData?.nextReview, p.isActive)).length;
+      const masteredCount = hasBackendData
+        ? (j as any).mastered_pages
+        : activePagesInJuz.filter(p => pageHasMapan(p)).length;
+
+      const nameAr = 'name_ar' in j ? (j as any).name_ar : (j as any).nameAr;
+      const nameEn = 'name_en' in j ? (j as any).name_en : (j as any).nameEn;
+      const startPage = 'start_page' in j ? (j as any).start_page : (j as any).startPage;
+      const endPage = 'end_page' in j ? (j as any).end_page : (j as any).endPage;
+      const totalPages = 'total_pages' in j ? (j as any).total_pages : ((j as any).endPage - (j as any).startPage + 1);
+      const surahSpan = 'surah_span' in j ? (j as any).surah_span : ('surahSpan' in j ? (j as any).surahSpan : '');
+      const ayahSpan = 'ayah_span' in j ? (j as any).ayah_span : ('ayahSpan' in j ? (j as any).ayahSpan : '');
+
       return {
-        ...j,
+        juzNumber: juzNum,
+        nameAr,
+        nameEn,
+        startPage,
+        endPage,
+        totalPages,
+        surahSpan,
+        ayahSpan,
         activeCount,
         masteredCount,
         dueCount,
@@ -255,27 +277,35 @@ export const QuranSpace: React.FC = () => {
   // Transform backend catalog pages to QuranPageItem for QuranPageCard rendering
   const displayedCatalogPages = useMemo<QuranPageItem[]>(() => {
     if (selectedJuzNumber && currentJuzData?.pages && currentJuzData.pages.length > 0) {
-      return currentJuzData.pages.map(p => ({
-        pageNumber: p.mushaf_page,
-        juzNumber: p.juz_number,
-        surahNameEn: p.surah_name_en,
-        surahNameAr: p.surah_name_ar,
-        surahNumber: p.surah_number || 1,
-        ayahRange: p.ayah_range,
-        isActive: p.is_activated,
-        status: p.activation_status === 'mastered' ? 'mastered_for_now' : (p.is_activated ? 'active' : 'inactive'),
-        mapanCelebrated: p.activation_status === 'mastered',
-        fsrsData: {
-          stability: p.stability || 0,
-          difficulty: p.difficulty || 5.0,
-          reps: p.review_count || 0,
-          lapses: 0,
-          lastReview: p.last_review_at || null,
-          nextReview: p.next_review_at || (p.is_activated ? new Date().toISOString() : null),
-          state: p.activation_status === 'mastered' ? 'mastered' : (p.review_count > 0 ? 'review' : 'new'),
-        },
-        reviewLogs: [],
-      }));
+      return currentJuzData.pages.map(p => {
+        const localPage = quranPages.find(qp => qp.pageNumber === p.mushaf_page);
+        const isAct = Boolean(p.is_activated || localPage?.isActive);
+        const isMapan = p.activation_status === 'mastered' || (localPage && pageHasMapan(localPage)) || (p.stability || 0) >= 30;
+        
+        return {
+          pageNumber: p.mushaf_page,
+          juzNumber: p.juz_number,
+          surahNameEn: p.surah_name_en,
+          surahNameAr: p.surah_name_ar,
+          surahNumber: p.surah_number || 1,
+          ayahRange: p.ayah_range,
+          isActive: isAct,
+          status: isMapan ? 'mastered_for_now' : (isAct ? 'active' : 'inactive'),
+          mapanCelebrated: isMapan || !!localPage?.mapanCelebrated,
+          mapanSchedule: localPage?.mapanSchedule,
+          fsrsData: {
+            stability: p.stability || localPage?.fsrsData?.stability || 0,
+            difficulty: p.difficulty || localPage?.fsrsData?.difficulty || 5.0,
+            reps: p.review_count || localPage?.fsrsData?.reps || 0,
+            lapses: localPage?.fsrsData?.lapses || 0,
+            lastReview: p.last_review_at || localPage?.fsrsData?.lastReview || null,
+            nextReview: p.next_review_at || localPage?.fsrsData?.nextReview || (isAct ? new Date().toISOString() : null),
+            state: isMapan ? 'mastered' : (p.review_count > 0 || (localPage?.fsrsData?.reps ?? 0) > 0 ? 'review' : 'new'),
+          },
+          reviewLogs: localPage?.reviewLogs || [],
+          issues: localPage?.issues || [],
+        };
+      });
     }
     return selectedJuzNumber ? quranPages.filter(p => p.juzNumber === selectedJuzNumber) : [];
   }, [currentJuzData, quranPages, selectedJuzNumber]);
@@ -311,8 +341,21 @@ export const QuranSpace: React.FC = () => {
 
   // Handle direct review action on page card with standard FSRS rating 1-4
   const handleInlineReview = async (pageNumber: number, rating: 1 | 2 | 3 | 4) => {
+    // 1. Optimistic update to AppContext for instant clearance from Daily Review / due badges
+    if (reviewQuranPage) {
+      reviewQuranPage(pageNumber, (rating === 4 ? 3 : rating) as 1 | 2 | 3);
+    }
+
     try {
+      // 2. Persist to backend and invalidate query caches
       await quranPageService.reviewPage({ page_number: pageNumber, rating });
+      queryClient.invalidateQueries({ queryKey: ["quran-juzs"] });
+      queryClient.invalidateQueries({ queryKey: ["quran-juz-pages"] });
+      queryClient.invalidateQueries({ queryKey: ["quran-pages-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["quran-juz30-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["my-items"] });
       await refetchPages();
       await refetchJuzList();
     } catch (err) {
@@ -363,9 +406,15 @@ export const QuranSpace: React.FC = () => {
   });
 
   // Calculate stats for current Juz in Screen 2
-  const currentJuzActiveCount = currentJuzData?.active_pages ?? displayedCatalogPages.filter(p => p.isActive).length;
-  const currentJuzDueCount = currentJuzData?.due_today ?? displayedCatalogPages.filter(p => isDue(p.fsrsData.nextReview, p.isActive)).length;
-  const currentJuzMapanCount = currentJuzData?.mastered_pages ?? displayedCatalogPages.filter(p => pageHasMapan(p)).length;
+  const currentJuzActiveCount = displayedCatalogPages.some(p => p.isActive)
+    ? displayedCatalogPages.filter(p => p.isActive).length
+    : (currentJuzData?.active_pages ?? 0);
+  const currentJuzDueCount = displayedCatalogPages.some(p => p.isActive)
+    ? displayedCatalogPages.filter(p => isDue(p.fsrsData.nextReview, p.isActive)).length
+    : (currentJuzData?.due_today ?? 0);
+  const currentJuzMapanCount = displayedCatalogPages.some(p => p.isActive)
+    ? displayedCatalogPages.filter(p => pageHasMapan(p)).length
+    : (currentJuzData?.mastered_pages ?? 0);
 
   return (
     <div className="space-y-3.5 sm:space-y-4 pb-20 md:pb-10 max-w-5xl mx-auto">
@@ -399,68 +448,73 @@ export const QuranSpace: React.FC = () => {
           </div>
           
           {/* Right: Unified Seamless Join Class Input + Button Container */}
-          <div className="relative shrink-0">
-            <form 
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!inputClassCode.trim()) return;
-                const res = await joinClassByCode(inputClassCode.trim());
-                setJoinStatus({ type: res.success ? 'success' : 'error', message: res.message });
-                if (res.success) setInputClassCode('');
-                setTimeout(() => setJoinStatus(null), 4000);
-              }}
-              className="flex items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5 shadow-2xs focus-within:ring-2 focus-within:ring-blue-500/40 transition-all h-8.5"
-            >
-              <input
-                type="text"
-                placeholder={language === 'en' ? 'Class Code...' : language === 'id' ? 'Kode Kelas...' : 'رمز الفصل...'}
-                value={inputClassCode}
-                onChange={(e) => setInputClassCode(e.target.value.toUpperCase())}
-                className="w-20 sm:w-28 pl-2.5 pr-1 text-xs font-mono font-bold tracking-wider placeholder:font-sans placeholder:font-normal bg-transparent focus:outline-none uppercase text-slate-800 dark:text-slate-100"
-              />
-              <button
-                type="submit"
-                disabled={!inputClassCode.trim()}
-                title={language === 'en' ? 'Join Class' : 'Gabung Kelas'}
-                className="h-7.5 px-2.5 rounded-lg bg-blue-600 dark:bg-blue-800 text-white font-bold text-xs hover:bg-blue-700 dark:hover:bg-blue-700 disabled:opacity-40 flex items-center gap-1 shrink-0 transition-all cursor-pointer active:scale-95 shadow-2xs"
+          {!isReadOnly && (
+            <div className="relative shrink-0">
+              <form 
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!inputClassCode.trim()) return;
+                  const res = await joinClassByCode(inputClassCode.trim());
+                  setJoinStatus({ type: res.success ? 'success' : 'error', message: res.message });
+                  if (res.success) setInputClassCode('');
+                  setTimeout(() => setJoinStatus(null), 4000);
+                }}
+                className="flex items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-0.5 shadow-2xs focus-within:ring-2 focus-within:ring-blue-500/40 transition-all h-8.5"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{language === 'en' ? 'Join' : 'Gabung'}</span>
-              </button>
-            </form>
-            {joinStatus && (
-              <p className={`text-[10px] mt-1 absolute top-full right-0 whitespace-nowrap z-20 ${joinStatus.type === 'success' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}`}>
-                {joinStatus.message}
-              </p>
-            )}
-          </div>
+                <input
+                  type="text"
+                  placeholder={language === 'en' ? 'Class Code...' : language === 'id' ? 'Kode Kelas...' : 'رمز الفصل...'}
+                  value={inputClassCode}
+                  onChange={(e) => setInputClassCode(e.target.value.toUpperCase())}
+                  className="w-20 sm:w-28 pl-2.5 pr-1 text-xs font-mono font-bold tracking-wider placeholder:font-sans placeholder:font-normal bg-transparent focus:outline-none uppercase text-slate-800 dark:text-slate-100"
+                />
+                <button
+                  type="submit"
+                  disabled={!inputClassCode.trim()}
+                  title={language === 'en' ? 'Join Class' : 'Gabung Kelas'}
+                  className="h-7.5 px-2.5 rounded-lg bg-blue-600 dark:bg-blue-800 text-white font-bold text-xs hover:bg-blue-700 dark:hover:bg-blue-700 disabled:opacity-40 flex items-center gap-1 shrink-0 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{language === 'en' ? 'Join' : 'Gabung'}</span>
+                </button>
+              </form>
+              {joinStatus && (
+                <p className={`text-[10px] mt-1 absolute top-full right-0 whitespace-nowrap z-20 ${joinStatus.type === 'success' ? 'text-blue-600 dark:text-blue-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}`}>
+                  {joinStatus.message}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {selectedJuzNumber === null ? (
         <div className="space-y-4">
-          {/* Standard Minimalist Due Card (Unified Across All Rooms) */}
-          <UnifiedDueCard
-            language={language}
-            title={language === 'en' ? 'Daily Review' : 'Kartu Jatuh Tempo'}
-            dueCount={totalDueToday}
-            totalActiveCount={totalActive}
-            itemTypeLabel={language === 'en' ? 'pages' : 'halaman'}
-            primaryActionLabel={language === 'en' ? `All (${totalDueToday})` : `Semua (${totalDueToday})`}
-            pillGridCols={5}
-            onStartAll={() => setReviewModalConfig({ isOpen: true, juzFilter: null })}
-            onOpenCalendar={() => setIsQuranCalendarOpen(true)}
-            filterPills={dueJuzNumbers.map(juzNum => ({
-              id: juzNum,
-              label: `J${juzNum}`,
-              count: dueJuzMap.get(juzNum) || 0,
-              onClick: () => setReviewModalConfig({ isOpen: true, juzFilter: juzNum }),
-            }))}
-            allCaughtUpTitle={language === 'en' ? 'All Quran pages reviewed today!' : 'Semua hafalan Al-Qur\'an sudah dimurajaah!'}
-          />
+          {/* Standard Minimalist Due Card (Unified Across All Rooms) - Hidden in Teacher / Read-Only Mode */}
+          {!isReadOnly && (
+            <UnifiedDueCard
+              language={language}
+              title={language === 'en' ? 'Daily Review' : 'Kartu Jatuh Tempo'}
+              dueCount={totalDueToday}
+              totalActiveCount={totalActive}
+              itemTypeLabel={language === 'en' ? 'pages' : 'halaman'}
+              primaryActionLabel={language === 'en' ? `All (${totalDueToday})` : `Semua (${totalDueToday})`}
+              pillGridCols={5}
+              onStartAll={() => setReviewModalConfig({ isOpen: true, juzFilter: null })}
+              onOpenCalendar={() => setIsQuranCalendarOpen(true)}
+              filterPills={dueJuzNumbers.map(juzNum => ({
+                id: juzNum,
+                label: `J${juzNum}`,
+                count: dueJuzMap.get(juzNum) || 0,
+                onClick: () => setReviewModalConfig({ isOpen: true, juzFilter: juzNum }),
+              }))}
+              allCaughtUpTitle={language === 'en' ? 'All Quran pages reviewed today!' : 'Semua hafalan Al-Qur\'an sudah dimurajaah!'}
+            />
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
             {effectiveJuzList.map(juz => {
+              const hasDue = juz.dueCount > 0;
               return (
                 <div
                   key={juz.juzNumber}
@@ -468,27 +522,42 @@ export const QuranSpace: React.FC = () => {
                     setSelectedJuzNumber(juz.juzNumber);
                     setActiveFilterTab('all');
                   }}
-                  className="bg-white dark:bg-slate-900 rounded-[8px] border border-[#ece6d9] dark:border-slate-800 px-3 py-1.5 hover:border-blue-600/60 dark:hover:border-blue-500/60 hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-2 group"
+                  className={`relative rounded-xl border px-3.5 py-2.5 transition-all cursor-pointer flex items-center justify-between gap-2.5 group shadow-2xs ${
+                    hasDue
+                      ? 'bg-amber-50/30 dark:bg-amber-950/20 border-amber-300/80 dark:border-amber-700/70 hover:border-amber-400 hover:shadow-amber-500/10'
+                      : 'bg-white dark:bg-slate-900 border-[#ece6d9] dark:border-slate-800 hover:border-blue-500/60 dark:hover:border-blue-500/60 hover:shadow-md'
+                  }`}
                 >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     <div className="truncate">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">Juz {juz.juzNumber}</h4>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{juz.surahSpan}</p>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">Juz {juz.juzNumber}</h4>
+                        {hasDue && (
+                          <span 
+                            className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-black bg-amber-500 text-white rounded-full shadow-xs animate-in zoom-in-75"
+                            title={`${juz.dueCount} ${language === 'en' ? 'pages due for review' : 'halaman perlu murajaah'}`}
+                          >
+                            {juz.dueCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{juz.surahSpan}</p>
                     </div>
                   </div>
                   
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium font-mono">
                       {juz.activeCount} / {juz.totalPages}
                     </span>
                     <div className="flex items-center gap-1">
-                      {juz.dueCount > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-[#fdeee9] dark:bg-rose-950/60 text-[#b85d38] dark:text-rose-300 font-bold text-[9px]">
+                      {hasDue && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100/90 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300/70 dark:border-amber-800 font-bold text-[9.5px] flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
                           {juz.dueCount} {t.due[language]}
                         </span>
                       )}
                       {juz.masteredCount > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-bold text-[9px]">
+                        <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 font-bold text-[9.5px]">
                           {juz.masteredCount} {t.mapan[language]}
                         </span>
                       )}
@@ -534,7 +603,7 @@ export const QuranSpace: React.FC = () => {
                 <span className="hidden sm:inline">{language === 'en' ? 'Schedule' : 'Jadwal'}</span>
               </button>
 
-              {currentJuzDueCount > 0 && (
+              {!isReadOnly && currentJuzDueCount > 0 && (
                 <button
                   onClick={() => setReviewModalConfig({ isOpen: true, juzFilter: selectedJuzNumber })}
                   className="px-4 py-2 rounded-full bg-blue-700 dark:bg-blue-800 hover:bg-[#0e2a21] dark:hover:bg-blue-700 text-white font-semibold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
@@ -637,6 +706,7 @@ export const QuranSpace: React.FC = () => {
                   key={page.pageNumber}
                   page={page}
                   language={language}
+                  isReadOnly={isReadOnly}
                   onToggleActive={(pageNumber) => {
                     handleTogglePageActive(pageNumber);
                   }}

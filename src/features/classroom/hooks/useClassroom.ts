@@ -73,6 +73,19 @@ export const useJoinClass = () => {
   });
 };
 
+// Hook to leave class (for student)
+export const useLeaveClass = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (classId: string) => classroomService.leaveClass(classId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-joined-classes"] });
+      queryClient.invalidateQueries({ queryKey: ["my-classes-teacher"] });
+    },
+  });
+};
+
 // Hook to fetch teacher's classes
 export const useGetClassMember = (classId: string) => {
   return useQuery({

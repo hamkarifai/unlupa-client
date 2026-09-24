@@ -28,7 +28,11 @@ export const useReviewQuranPage = () => {
       toast.success(`Halaman ${variables.page_number} berhasil direview!`);
       queryClient.invalidateQueries({ queryKey: ["quran-pages-progress"] });
       queryClient.invalidateQueries({ queryKey: ["quran-juz30-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["quran-juzs"] });
+      queryClient.invalidateQueries({ queryKey: ["quran-juz-pages"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["my-items"] });
     },
     onError: (error: unknown) => {
       toast.error("Gagal mengirim penilaian halaman. Silakan coba lagi.");

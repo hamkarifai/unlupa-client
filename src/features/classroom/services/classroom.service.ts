@@ -87,6 +87,12 @@ export const classroomService = {
     return response.data.data;
   },
 
+  // LEAVE CLASS (for student)
+  leaveClass: async (classId: string): Promise<any> => {
+    const response = await api.delete(`/api/v1/classes/${classId}/leave`);
+    return response.data;
+  },
+
   // GET CLASS MEMBER (TEACHER)
   getClassMember: async (classId: string): Promise<ClassMember[]> => {
     const response = await api.get(`/api/v1/classes/${classId}/members`);

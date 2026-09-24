@@ -2,23 +2,23 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { quranCatalogService, QuranJuzCatalogItem, JuzPagesResponse } from "../services/quranCatalog.service";
 
-export const useQuranCatalog = (selectedJuzNumber?: number | null) => {
+export const useQuranCatalog = (selectedJuzNumber?: number | null, targetUserId?: string | null) => {
   const queryClient = useQueryClient();
   const [activatingPages, setActivatingPages] = useState<Record<number, boolean>>({});
 
   // 1. Fetch 30 Juz with user progress stats
   const juzsQuery = useQuery({
-    queryKey: ["quran-juzs"],
-    queryFn: () => quranCatalogService.getJuzs(),
-    staleTime: 1000 * 60 * 5, // 5 mins
+    queryKey: ["quran-juzs", targetUserId || "me"],
+    queryFn: () => quranCatalogService.getJuzs(targetUserId || undefined),
+    staleTime: 1000 * 10, // 10s
   });
 
   // 2. Fetch Pages for selected Juz
   const pagesQuery = useQuery({
-    queryKey: ["quran-juz-pages", selectedJuzNumber],
-    queryFn: () => (selectedJuzNumber ? quranCatalogService.getJuzPages(selectedJuzNumber) : null),
+    queryKey: ["quran-juz-pages", selectedJuzNumber, targetUserId || "me"],
+    queryFn: () => (selectedJuzNumber ? quranCatalogService.getJuzPages(selectedJuzNumber, targetUserId || undefined) : null),
     enabled: !!selectedJuzNumber && selectedJuzNumber >= 1 && selectedJuzNumber <= 30,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 10,
   });
 
   // 3. Activate Page Mutation
@@ -31,10 +31,10 @@ export const useQuranCatalog = (selectedJuzNumber?: number | null) => {
         setActivatingPages(prev => ({ ...prev, [mushafPage]: false }));
       }
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       // Invalidate queries to refresh counts and page statuses
       queryClient.invalidateQueries({ queryKey: ["quran-juzs"] });
-      queryClient.invalidateQueries({ queryKey: ["quran-juz-pages", data.juz_number] });
+      queryClient.invalidateQueries({ queryKey: ["quran-juz-pages"] });
       queryClient.invalidateQueries({ queryKey: ["my-items"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     },

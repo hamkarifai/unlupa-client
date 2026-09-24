@@ -25,8 +25,8 @@ import { JUZ_LIST } from '../../data/quranData';
 import { isDue } from '../../lib/fsrs';
 
 interface Props {
-  onOpenQuranReview: (juzNumber?: number) => void;
-  onOpenPersonalReview: () => void;
+  onOpenQuranReview?: (juzNumber?: number) => void;
+  onOpenPersonalReview?: () => void;
   onOpenMushafViewer: (pageNumber: number) => void;
 }
 
@@ -48,8 +48,6 @@ function formatLocalDate(d: Date | string | number | null | undefined): string {
 }
 
 export const VisualReviewCalendar: React.FC<Props> = ({
-  onOpenQuranReview,
-  onOpenPersonalReview,
   onOpenMushafViewer,
 }) => {
   const { 
@@ -797,15 +795,15 @@ export const VisualReviewCalendar: React.FC<Props> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   if (selectedDateDetails.plannedQuran.length > 0) {
-                    onOpenQuranReview();
+                    setActiveSpace('quran');
                   } else {
-                    onOpenPersonalReview();
+                    setActiveSpace('personal');
                   }
                 }}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
               >
-                <Play className="w-3 h-3 fill-white" />
-                <span>{language === 'en' ? 'Review Now' : 'Mulai Murajaah'}</span>
+                <span>{language === 'en' ? 'Open Space' : 'Buka Ruang'}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
             <button
@@ -877,11 +875,11 @@ export const VisualReviewCalendar: React.FC<Props> = ({
                             {selectedDateDetails.isDateToday && (
                               <button
                                 type="button"
-                                onClick={() => onOpenQuranReview(p.juzNumber)}
-                                title={language === 'en' ? 'Review Page' : 'Murajaah'}
+                                onClick={() => setActiveSpace('quran')}
+                                title={language === 'en' ? 'Open Quran Space' : 'Buka Ruang Quran'}
                                 className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
                               >
-                                <Play className="w-3.5 h-3.5 fill-white" />
+                                <ChevronRight className="w-3.5 h-3.5" />
                               </button>
                             )}
                           </div>
@@ -915,11 +913,11 @@ export const VisualReviewCalendar: React.FC<Props> = ({
                           {selectedDateDetails.isDateToday && (
                             <button
                               type="button"
-                              onClick={onOpenPersonalReview}
-                              title={language === 'en' ? 'Review Card' : 'Murajaah'}
+                              onClick={() => setActiveSpace('personal')}
+                              title={language === 'en' ? 'Open Personal Space' : 'Buka Ruang Pribadi'}
                               className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shrink-0"
                             >
-                              <Play className="w-3.5 h-3.5 fill-white" />
+                              <ChevronRight className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>

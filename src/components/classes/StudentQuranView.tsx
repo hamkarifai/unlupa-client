@@ -18,6 +18,7 @@ export const StudentQuranView: React.FC<StudentQuranViewProps> = ({ student, cla
 
   const studentContext = useMemo(() => {
     const isCurrentUser = student.quranSpaceCode === parentContext.quranSpaceCode;
+    const targetStudentId = student.id.startsWith('std-user-') ? student.id.replace('std-user-', '') : student.id;
     
     // Ensure student data has all 604 pages
     let fullPages: QuranPageItem[];
@@ -64,32 +65,15 @@ export const StudentQuranView: React.FC<StudentQuranViewProps> = ({ student, cla
       quranStats: quranStats,
       teacherFeedbacks: student.teacherFeedbacks || parentContext.teacherFeedbacks,
       isTeacherMode: true,
+      isReadOnlyMode: true,
+      inspectingStudentId: targetStudentId,
       
-      // Real Teacher review handler: updates student's memory rating directly!
-      reviewQuranPage: (pageNumber: number, rating: 1 | 2 | 3) => {
-        parentContext.reviewStudentQuranPage(classGroup.id, student.id, pageNumber, rating);
-        return null;
-      },
-      
-      // Teacher can activate new page for student directly during halaqah
-      activateQuranPage: (pageNumber: number) => {
-        parentContext.activateStudentQuranPage(classGroup.id, student.id, pageNumber);
-      },
-
-      // Teacher can deactivate page
-      deactivateQuranPage: (pageNumber: number) => {
-        parentContext.deactivateStudentQuranPage(classGroup.id, student.id, pageNumber);
-      },
-
-      // Teacher can mark page as mapan (>300d)
-      bypassQuranPageToMapan: (pageNumber: number) => {
-        parentContext.bypassStudentQuranPageMapan(classGroup.id, student.id, pageNumber);
-      },
-
-      // Teacher can reset mapan status
-      resetQuranPageMapan: (pageNumber: number) => {
-        parentContext.resetStudentQuranPageMapan(classGroup.id, student.id, pageNumber);
-      }
+      // Teacher inspection mode is read-only (guru hanya cek progress, tidak melakukan aksi ke item)
+      reviewQuranPage: () => null,
+      activateQuranPage: () => {},
+      deactivateQuranPage: () => {},
+      bypassQuranPageToMapan: () => {},
+      resetQuranPageMapan: () => {}
     };
   }, [parentContext, student, classGroup]);
 
@@ -131,7 +115,7 @@ export const StudentQuranView: React.FC<StudentQuranViewProps> = ({ student, cla
                 studentName: student.name,
                 studentId: student.quranSpaceCode || student.id,
                 className: classGroup.name,
-                teacherName: parentContext.userProfile.fullName,
+                teacherName: parentContext.userProfile?.fullName || 'Pengajar',
                 date: new Date().toISOString()
               };
               const encoded = btoa(encodeURIComponent(JSON.stringify(reportData)));

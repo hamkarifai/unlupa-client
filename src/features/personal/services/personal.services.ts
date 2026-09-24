@@ -259,8 +259,14 @@ export const personalService = {
     return response.data;
   },
 
-  async requestPublishBook(id: string): Promise<RequestPublishBookResponse> {
-    const response = await api.post(`/api/v1/books/${id}/request-publish`);
+  async requestPublishBook(
+    id: string,
+    payload?: { is_editable?: boolean },
+  ): Promise<RequestPublishBookResponse> {
+    const response = await api.post(
+      `/api/v1/books/${id}/request-publish`,
+      payload || { is_editable: true },
+    );
     return response.data;
   },
 
@@ -361,6 +367,20 @@ export const personalService = {
 
   async getItemsByStatus(status: string): Promise<GetItemsByStatusResponse> {
     const response = await api.get(`/api/v1/items`, { params: { status } });
+    return response.data;
+  },
+
+  async generateAIBook(payload: { topic?: string; text?: string; language?: string }): Promise<{ status: number; message: string; data: { book: any } }> {
+    const response = await api.post("/api/v1/ai/generate-book", payload, {
+      timeout: 120000,
+    });
+    return response.data;
+  },
+
+  async generateAICards(payload: { topic?: string; text?: string; language?: string }): Promise<{ status: number; message: string; data: { cards: any[] } }> {
+    const response = await api.post("/api/v1/ai/generate-cards", payload, {
+      timeout: 120000,
+    });
     return response.data;
   },
 };

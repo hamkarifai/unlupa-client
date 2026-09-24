@@ -70,13 +70,15 @@ export interface ActivatePageResponse {
 }
 
 export const quranCatalogService = {
-  async getJuzs(): Promise<QuranJuzCatalogItem[]> {
-    const res = await api.get<{ data: QuranJuzCatalogItem[] }>("/api/v1/quran/juzs");
+  async getJuzs(userId?: string): Promise<QuranJuzCatalogItem[]> {
+    const params = userId ? { user_id: userId } : undefined;
+    const res = await api.get<{ data: QuranJuzCatalogItem[] }>("/api/v1/quran/juzs", { params });
     return res.data.data;
   },
 
-  async getJuzPages(juzNumber: number): Promise<JuzPagesResponse> {
-    const res = await api.get<{ data: JuzPagesResponse }>(`/api/v1/quran/juzs/${juzNumber}/pages`);
+  async getJuzPages(juzNumber: number, userId?: string): Promise<JuzPagesResponse> {
+    const params = userId ? { user_id: userId } : undefined;
+    const res = await api.get<{ data: JuzPagesResponse }>(`/api/v1/quran/juzs/${juzNumber}/pages`, { params });
     return res.data.data;
   },
 

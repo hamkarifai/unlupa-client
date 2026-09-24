@@ -137,6 +137,7 @@ export interface Book {
   price?: number;
   downloads?: number;
   rating?: number;
+  totalItemsCount?: number;
   createdAt: string;
   updatedAt: string;
 }

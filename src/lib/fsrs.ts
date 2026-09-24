@@ -55,18 +55,46 @@ export const NON_QURAN_TARGET_RETENTION = 0.92; // 92% target retention for gene
 export const QURAN_MAX_INTERVAL_DAYS = 36500; // Tidak dibatasi 30 hari; interval adaptif bebas bertumbuh ke 100d, 200d, 1000d+
 export const NON_QURAN_MAX_INTERVAL_DAYS = 36500; // General knowledge max interval
 
-export const FSRS6_WEIGHTS: number[] = [...default_w];
-export const FSRS_DECAY = FSRS6_DEFAULT_DECAY; // 0.1542
-export const FSRS_FACTOR = Math.pow(0.9, -1 / FSRS_DECAY) - 1; // ≈ 0.980346
+export const FSRS6_WEIGHTS: number[] = [
+  0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666,
+  0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658,
+  0.1542,
+];
+
+const W = FSRS6_WEIGHTS;
+export const FSRS_DECAY = -W[20]; // -0.1542
+export const FSRS_FACTOR = Math.pow(0.9, 1 / FSRS_DECAY) - 1; // ≈ 0.980346
+
+function clamp(x: number, a: number, b: number) { return Math.min(b, Math.max(a, x)); }
+export function initStability(r: number) { return W[r - 1] ?? W[0]; }
+export function d0Easy() { return clamp(W[4] - Math.exp(W[5] * 3) + 1, 1, 10); }
+export function initDifficulty(r: number) { return clamp(W[4] - Math.exp(W[5] * (r - 1)) + 1, 1, 10); }
+export function nextDifficulty(d: number, r: number) {
+  const dp = d - W[6] * (r - 3);
+  return clamp(W[7] * d0Easy() + (1 - W[7]) * dp, 1, 10);
+}
+export function retrievability(t: number, S: number) {
+  if (S <= 0) return 0;
+  if (t <= 0) return 1.0;
+  return Math.pow(1 + FSRS_FACTOR * (t / S), FSRS_DECAY);
+}
+export function nextStabilitySuccess(S: number, D: number, R: number, r: number) {
+  const hardPenalty = r === 2 ? W[15] : 1;
+  const easyBonus = r === 4 ? W[16] : 1;
+  const sinc = 1 + Math.exp(W[8]) * (11 - D) * Math.pow(S, -W[9]) * (Math.exp((1 - R) * W[10]) - 1) * hardPenalty * easyBonus;
+  return S * sinc;
+}
+export function nextStabilityFail(S: number, D: number, R: number) {
+  const sNew = W[11] * Math.pow(D, -W[12]) * (Math.pow(S + 1, W[13]) - 1) * Math.exp((1 - R) * W[14]);
+  return Math.min(sNew, S);
+}
+export function intervalFromStability(S: number, r: number = QURAN_TARGET_RETENTION) {
+  if (S <= 0) return 1;
+  const iv = (S / FSRS_FACTOR) * (Math.pow(r, 1 / FSRS_DECAY) - 1);
+  return Math.max(1, Math.round(iv));
+}
 
 // Initialise Schedulers using the official ts-fsrs library
-const quranScheduler = fsrs(generatorParameters({
-  request_retention: QURAN_TARGET_RETENTION,
-  maximum_interval: QURAN_MAX_INTERVAL_DAYS,
-  enable_fuzz: false,
-  enable_short_term: false,
-}));
-
 const nonQuranScheduler = fsrs(generatorParameters({
   request_retention: NON_QURAN_TARGET_RETENTION,
   maximum_interval: NON_QURAN_MAX_INTERVAL_DAYS,
@@ -123,21 +151,17 @@ function stateToCard(state: FSRSState, reviewDate: Date): Card {
  * Returns a value between 0.0 and 1.0 (e.g. 0.95 = 95% retention probability)
  */
 export function calculateRetrievability(stability: number, daysSinceLastReview: number): number {
-  if (stability <= 0) return 0;
-  if (daysSinceLastReview <= 0) return 1.0;
-  const r = Math.pow(1 + FSRS_FACTOR * (daysSinceLastReview / stability), -FSRS_DECAY);
-  return Math.min(1.0, Math.max(0.0, r));
+  return retrievability(daysSinceLastReview, stability);
 }
 
 /**
  * Calculate review interval in days given Stability and Target Retention.
  * Formula: I(r, S) = (S / FACTOR) * (r^(-1 / DECAY) - 1)
  */
-export function calculateInterval(stability: number, targetRetention: number, maxInterval: number): number {
+export function calculateInterval(stability: number, targetRetention: number = QURAN_TARGET_RETENTION, maxInterval: number = QURAN_MAX_INTERVAL_DAYS): number {
   if (stability <= 0) return 1;
-  const rawInterval = (stability / FSRS_FACTOR) * (Math.pow(targetRetention, -1 / FSRS_DECAY) - 1);
-  const rounded = Math.max(1, Math.round(rawInterval));
-  return Math.min(rounded, maxInterval);
+  const rawInterval = intervalFromStability(stability, targetRetention);
+  return Math.min(rawInterval, maxInterval);
 }
 
 /**
@@ -194,99 +218,68 @@ export function calculateNextMapanDate(
 
 /**
  * ============================================================================
- * MESIN 1: AL-QUR'AN MEMORY ENGINE
+ * MESIN 1: AL-QUR'AN MEMORY ENGINE (FSRS-6 RESMI RETENSI 95%)
  * ============================================================================
  * Khusus dirancang untuk hafalan ayat suci Al-Qur'an:
  * - Target Retensi: 95% (0.95)
- * - Skala Umpan Balik: Tepat 2 Tingkat
- *   * Rating 1: Perlu Murajaah (Rating.Again) -> Mengatur ulang interval ke 1 hari (turun dari Mapan jika goyah)
- *   * Rating 2: Lancar (Rating.Hard) -> Perhitungan stability & interval terus berlanjut
- * - Status Mapan: Tercapai saat interval > 30 hari. Perhitungan stabilitas tidak berhenti.
- * - Ritme Mapan: Pengguna dapat memilih FSRS adaptif (35d, 45d, 60d...) atau mandiri (hari tetap mingguan / tanggal tetap bulanan).
+ * - Skala Umpan Balik:
+ *   * Rating 1: Perlu Murajaah (Again) -> nextStabilityFail
+ *   * Rating 2: Lancar (Hard) -> nextStabilitySuccess (Hard)
+ *   * Rating 3: Mutqin (Good) -> nextStabilitySuccess (Good) [Terbuka jika pernah >30 hari]
+ *   * Rating 4: Sangat Lancar (Easy) -> nextStabilitySuccess (Easy)
+ * - Status Mapan: Tercapai saat interval >= 30 hari atau stability >= 30.
  */
 export function updateQuranFSRS(
   currentState: FSRSState,
-  rating: 1 | 2 | 3,
+  rating: 1 | 2 | 3 | 4,
   reviewDate: Date = new Date(),
   mapanSchedule?: MapanScheduleConfig
 ): { newState: FSRSState; nextIntervalDays: number; isMasteredForNow: boolean } {
   const reps = (currentState.reps || 0) + 1;
-  const currentS = currentState.stability || 0;
-  const difficulty = 10.0; // Standar kelancaran mutlak Al-Qur'an (D maksimum)
+  let lapses = currentState.lapses || 0;
 
-  // Hitung elapsed days dari review sebelumnya jika ada
-  let elapsedDays = 0;
-  if (currentState.lastReview) {
+  const currentS = currentState.stability || 0;
+  const currentD = currentState.difficulty || 5.0;
+
+  let nextS: number;
+  let nextD: number;
+
+  if (!currentS || currentS <= 0 || !currentState.lastReview) {
+    // Initial Review
+    nextS = initStability(rating);
+    nextD = initDifficulty(rating);
+    if (rating === 1) lapses += 1;
+  } else {
+    // Hitung elapsed days dari review sebelumnya jika ada
     const last = new Date(currentState.lastReview);
     const curr = new Date(reviewDate);
     last.setHours(0, 0, 0, 0);
     curr.setHours(0, 0, 0, 0);
-    elapsedDays = Math.max(0, Math.round((curr.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)));
+    const elapsedDays = Math.max(0, Math.round((curr.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)));
+
+    const R = retrievability(elapsedDays, currentS);
+
+    if (rating === 1) {
+      lapses += 1;
+      nextS = nextStabilityFail(currentS, currentD, R);
+    } else {
+      nextS = nextStabilitySuccess(currentS, currentD, R, rating);
+    }
+    nextD = nextDifficulty(currentD, rating);
   }
 
-  let nextS = currentS;
-  let lapses = currentState.lapses || 0;
-
-  if (rating === 1) {
-    // Rating 1: Perlu Murajaah (Again) -> Memori goyah, reset interval ke 1 hari
-    // Status Mapan otomatis gugur kembali ke review reguler
-    lapses += 1;
-    nextS = Math.max(1.0, Number((currentS * 0.2).toFixed(2)));
-  } else if (rating === 2) {
-    // Rating 2: Kurang Lancar / Cukup / Terbata (Hard) -> Kenaikan bertahap konservatif
-    if (!currentS || currentS <= 0 || reps === 1) {
-      nextS = 2.70;
-    } else {
-      let inc: number;
-      if (currentS < 74.5) {
-        inc = 0.18635 * Math.pow(currentS, -0.20407);
-      } else {
-        inc = Math.max(0.30, 0.45 * Math.pow(currentS / 74.5, -0.12));
-      }
-
-      // Bonus ketahanan memori jika murajaah dilakukan tepat waktu atau melampaui interval
-      const expectedInterval = currentS * 0.4025587;
-      if (elapsedDays > expectedInterval && currentS > 0) {
-        const decay = -FSRS_DECAY;
-        const R = Math.pow(1 + FSRS_FACTOR * (elapsedDays / currentS), -decay);
-        const boost = (Math.exp((1 - R) * 0.796) - 1) / (Math.exp((1 - QURAN_TARGET_RETENTION) * 0.796) - 1);
-        inc = inc * Math.max(1.0, Math.min(2.5, boost));
-      }
-      nextS = Number((currentS * (1 + inc)).toFixed(2));
-    }
-  } else {
-    // Rating 3: Lancar Mutqin / Mumtaz (Good) -> Kenaikan stabilitas lebih cepat & optimal
-    if (!currentS || currentS <= 0 || reps === 1) {
-      nextS = 5.50;
-    } else {
-      let inc: number;
-      if (currentS < 74.5) {
-        inc = 0.45 * Math.pow(currentS, -0.14);
-      } else {
-        inc = Math.max(0.60, 0.85 * Math.pow(currentS / 74.5, -0.10));
-      }
-
-      const expectedInterval = currentS * 0.4025587;
-      if (elapsedDays > expectedInterval && currentS > 0) {
-        const decay = -FSRS_DECAY;
-        const R = Math.pow(1 + FSRS_FACTOR * (elapsedDays / currentS), -decay);
-        const boost = (Math.exp((1 - R) * 0.796) - 1) / (Math.exp((1 - QURAN_TARGET_RETENTION) * 0.796) - 1);
-        inc = inc * Math.max(1.0, Math.min(2.5, boost));
-      }
-      nextS = Number((currentS * (1 + inc)).toFixed(2));
-    }
-  }
+  nextS = Number(Math.max(0.01, nextS).toFixed(4));
+  nextD = Number(clamp(nextD, 1, 10).toFixed(4));
 
   // Raw interval berdasarkan retensi 95%
-  const rawInterval = Math.round(nextS * 0.4025587);
-  // Item berstatus Mapan jika interval mencapai di atas 30 hari
-  const isMasteredForNow = rawInterval > 30;
+  const rawInterval = intervalFromStability(nextS, QURAN_TARGET_RETENTION);
+  const isMasteredForNow = rawInterval >= 30 || nextS >= 30.0;
 
   let nextReviewDate: Date;
   let nextIntervalDays: number;
 
   if (rating === 1) {
-    // Jika perlu murajaah (lupa/ragu), interval langsung 1 hari
+    // Jika perlu murajaah (Again), interval 1 hari
     nextIntervalDays = 1;
     nextReviewDate = new Date(reviewDate);
     nextReviewDate.setDate(nextReviewDate.getDate() + 1);
@@ -304,7 +297,7 @@ export function updateQuranFSRS(
 
   const newState: FSRSState = {
     stability: nextS,
-    difficulty,
+    difficulty: nextD,
     reps,
     lapses,
     lastReview: reviewDate.toISOString(),
@@ -317,11 +310,10 @@ export function updateQuranFSRS(
 
 /**
  * ============================================================================
- * MESIN 2: BUKU & PENGETAHUAN UMUM MEMORY ENGINE
+ * MESIN 2: BUKU & PENGETAHUAN UMUM MEMORY ENGINE (FSRS-6 RESMI)
  * ============================================================================
  * Dirancang untuk buku, konsep ilmu pengetahuan, dan catatan kartu:
- * - Target Retensi: 92% (0.92) — penjadwalan presisi tinggi buku & ilmu
- * - Rotasi Maksimal: Terbuka (36.500 Hari)
+ * - Target Retensi: 90% (0.90) / 92% (0.92) — FSRS-6 murni
  * - Skala Umpan Balik: 4 Tingkat (1: Again, 2: Hard, 3: Good, 4: Easy)
  */
 export function updateNonQuranFSRS(
@@ -329,31 +321,55 @@ export function updateNonQuranFSRS(
   rating: 1 | 2 | 3 | 4,
   reviewDate: Date = new Date()
 ): { newState: FSRSState; nextIntervalDays: number } {
-  const ratingMap = {
-    1: Rating.Again,
-    2: Rating.Hard,
-    3: Rating.Good,
-    4: Rating.Easy,
-  };
+  const reps = (currentState.reps || 0) + 1;
+  let lapses = currentState.lapses || 0;
 
-  const mappedRating = ratingMap[rating] as 1 | 2 | 3 | 4;
-  const card = stateToCard(currentState, reviewDate);
+  const currentS = currentState.stability || 0;
+  const currentD = currentState.difficulty || 5.0;
 
-  const record = nonQuranScheduler.next(card, reviewDate, mappedRating);
-  const nextCard = record.card;
+  let nextS: number;
+  let nextD: number;
 
-  const nextIntervalDays = Math.max(1, nextCard.scheduled_days);
+  if (!currentS || currentS <= 0 || !currentState.lastReview) {
+    // Initial Review
+    nextS = initStability(rating);
+    nextD = initDifficulty(rating);
+    if (rating === 1) lapses += 1;
+  } else {
+    const last = new Date(currentState.lastReview);
+    const curr = new Date(reviewDate);
+    last.setHours(0, 0, 0, 0);
+    curr.setHours(0, 0, 0, 0);
+    const elapsedDays = Math.max(0, Math.round((curr.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)));
+
+    const R = retrievability(elapsedDays, currentS);
+
+    if (rating === 1) {
+      lapses += 1;
+      nextS = nextStabilityFail(currentS, currentD, R);
+    } else {
+      nextS = nextStabilitySuccess(currentS, currentD, R, rating);
+    }
+    nextD = nextDifficulty(currentD, rating);
+  }
+
+  nextS = Number(Math.max(0.01, nextS).toFixed(4));
+  nextD = Number(clamp(nextD, 1, 10).toFixed(4));
+
+  const rawInterval = intervalFromStability(nextS, NON_QURAN_TARGET_RETENTION);
+  const nextIntervalDays = rating === 1 ? 1 : Math.max(1, Math.min(rawInterval, NON_QURAN_MAX_INTERVAL_DAYS));
+
   const nextReviewDate = new Date(reviewDate);
   nextReviewDate.setDate(nextReviewDate.getDate() + nextIntervalDays);
 
   const newState: FSRSState = {
-    stability: Number(nextCard.stability.toFixed(2)),
-    difficulty: Number(nextCard.difficulty.toFixed(2)),
-    reps: nextCard.reps,
-    lapses: nextCard.lapses,
+    stability: nextS,
+    difficulty: nextD,
+    reps,
+    lapses,
     lastReview: reviewDate.toISOString(),
     nextReview: nextReviewDate.toISOString(),
-    state: nextCard.reps >= 3 ? 'review' : 'learning',
+    state: reps >= 3 ? 'review' : 'learning',
   };
 
   return { newState, nextIntervalDays };
@@ -401,9 +417,14 @@ export function predictQuranIntervals(
   goodDays: number;
   iKnowDays: number;
 } {
-  const simNeedReview = updateQuranFSRS(currentState, 1, new Date(), mapanSchedule);
-  const simHard = updateQuranFSRS(currentState, 2, new Date(), mapanSchedule);
-  const simGood = updateQuranFSRS(currentState, 3, new Date(), mapanSchedule);
+  const now = new Date();
+  const effectiveDate = (currentState.nextReview && new Date(currentState.nextReview) > now)
+    ? new Date(currentState.nextReview)
+    : now;
+
+  const simNeedReview = updateQuranFSRS(currentState, 1, effectiveDate, mapanSchedule);
+  const simHard = updateQuranFSRS(currentState, 2, effectiveDate, mapanSchedule);
+  const simGood = updateQuranFSRS(currentState, 3, effectiveDate, mapanSchedule);
 
   const r1 = `${simNeedReview.nextIntervalDays}d`;
   let r2 = `${simHard.nextIntervalDays}d`;
@@ -447,10 +468,14 @@ export function predictNonQuranIntervals(currentState: FSRSState, reviewDate: Da
   goodDays: number;
   easyDays: number;
 } {
-  const sim1 = updateNonQuranFSRS(currentState, 1, reviewDate);
-  const sim2 = updateNonQuranFSRS(currentState, 2, reviewDate);
-  const sim3 = updateNonQuranFSRS(currentState, 3, reviewDate);
-  const sim4 = updateNonQuranFSRS(currentState, 4, reviewDate);
+  const effectiveDate = (currentState.nextReview && new Date(currentState.nextReview) > reviewDate)
+    ? new Date(currentState.nextReview)
+    : reviewDate;
+
+  const sim1 = updateNonQuranFSRS(currentState, 1, effectiveDate);
+  const sim2 = updateNonQuranFSRS(currentState, 2, effectiveDate);
+  const sim3 = updateNonQuranFSRS(currentState, 3, effectiveDate);
+  const sim4 = updateNonQuranFSRS(currentState, 4, effectiveDate);
 
   const formatDays = (days: number) => {
     if (days <= 1) return '1d';
@@ -506,13 +531,13 @@ export function isDue(nextReviewIso: string | null, isActive: boolean): boolean 
 
 export function calculateStabilityDays(stability: number): number {
   if (!stability || stability <= 0) return 0;
-  return Math.max(1, Math.round(stability * 0.4025587));
+  return intervalFromStability(stability, QURAN_TARGET_RETENTION);
 }
 
 export type QuranIntervalClusterKey = '<5' | '<10' | '<15' | '<20' | '<30' | '>30';
 
 export function getQuranPageClusterKey(page: { status?: string; fsrsData: { stability?: number } }): QuranIntervalClusterKey {
-  const rawInterval = Math.round((page.fsrsData.stability || 0) * 0.4025587);
+  const rawInterval = intervalFromStability(page.fsrsData.stability || 0, QURAN_TARGET_RETENTION);
   const isMapan = page.status === 'mastered_for_now' || rawInterval >= 30;
   if (isMapan) return '>30';
   if (rawInterval < 5) return '<5';

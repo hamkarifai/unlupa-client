@@ -3,7 +3,7 @@ import axios from "axios";
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {
@@ -19,9 +19,15 @@ api.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const url = error.config?.url ?? "";
-      if (!url.includes("/auth/login")) {
+      if (!url.includes("/auth/login") && !url.includes("/auth/register")) {
         useAuthStore.getState().logout();
-        window.location.href = "/login";
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login" &&
+          window.location.pathname !== "/register"
+        ) {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

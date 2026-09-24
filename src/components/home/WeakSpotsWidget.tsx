@@ -4,15 +4,14 @@ import { BookOpen, Sparkles, ChevronRight, AlertCircle, Bookmark, ArrowRight, Sh
 import { QuranPageItem } from '../../types';
 
 interface Props {
-  onOpenQuranReview: (juzNumber?: number) => void;
+  onOpenQuranReview?: (juzNumber?: number) => void;
   onOpenMushafViewer: (pageNumber: number) => void;
 }
 
 export const WeakSpotsWidget: React.FC<Props> = ({
-  onOpenQuranReview,
   onOpenMushafViewer
 }) => {
-  const { quranPages, language } = useApp();
+  const { quranPages, language, setActiveSpace } = useApp();
 
   // Find pages that either have unresolved issues OR have difficulty >= 7 OR high lapses
   const weakPages = useMemo(() => {
@@ -92,10 +91,10 @@ export const WeakSpotsWidget: React.FC<Props> = ({
               </div>
 
               <button
-                onClick={() => onOpenQuranReview(page.juzNumber)}
+                onClick={() => setActiveSpace('quran')}
                 className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs active:scale-95"
               >
-                <span>{language === 'en' ? 'Review' : 'Murajaah'}</span>
+                <span>{language === 'en' ? 'Review in Space' : 'Buka Ruang'}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>

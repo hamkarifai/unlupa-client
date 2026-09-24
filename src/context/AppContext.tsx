@@ -39,6 +39,8 @@ import { useClassCleanup } from '../hooks/useClassCleanup';
 import { quranCatalogService } from '@/features/alquran/services/quranCatalog.service';
 import { quranPageService } from '@/features/alquran/services/quranPage.service';
 import { personalService } from '@/features/personal/services/personal.services';
+import { classroomService } from '@/features/classroom/services/classroom.service';
+import type { ClassItem } from '@/features/classroom/types';
 import { useAuthStore } from '@/features/auth/stores/auth.store';
 
 interface PersonalStats {
@@ -163,6 +165,7 @@ interface AppContextType {
   deleteItem: (itemId: string) => Promise<void> | void;
   loadBookTree: (bookId: string) => Promise<void>;
   fetchUserBooks: () => Promise<void>;
+  fetchPublishedLibrary: () => Promise<void>;
 
   importFromLibrary: (libId: string) => void;
   importFromJSON: (jsonStr: string) => { success: boolean; message: string };
@@ -182,6 +185,8 @@ interface AppContextType {
   openCheckoutModal: (entry: LibraryEntry) => void;
   closeCheckoutModal: () => void;
 
+  fetchClasses: () => Promise<void>;
+  fetchClassMembers: (classId: string) => Promise<void>;
   joinClassByCode: (code: string) => Promise<{ success: boolean; message: string }>;
   leaveClass: (classId: string) => void;
   createTeachingClass: (data: { 
@@ -213,6 +218,9 @@ interface AppContextType {
 
   getLiveStudentQuranData: (studentId: string) => QuranPageItem[];
   getLiveStudentBookItems: (studentId: string) => BookItem[];
+
+  inspectingStudentId?: string | null;
+  isReadOnlyMode?: boolean;
 
   resetToDefaults: () => void;
 }
@@ -352,8 +360,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) { /* ignore */ }
     }
     return {
-      id: authState?.id || 'guest',
-      quranSpaceCode: authState?.id ? `UNL-QRN-${authState.id.slice(0, 4).toUpperCase()}` : 'UNL-QRN-GUEST',
+      id: authState?.id ? String(authState.id) : 'guest',
+      quranSpaceCode: authState?.id ? `UNL-QRN-${String(authState.id).slice(0, 4).toUpperCase()}` : 'UNL-QRN-GUEST',
       fullName: authState?.name || 'Santri',
       email: authState?.email || '',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -363,19 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const authUser = useAuthStore((state) => state.user);
-
-  useEffect(() => {
-    if (authUser) {
-      setUserProfile(prev => ({
-        ...prev,
-        id: authUser.id || prev.id,
-        email: authUser.email || prev.email,
-        fullName: authUser.name || prev.fullName,
-        plan: authUser.is_premium ? 'premium' : (prev.plan || 'free'),
-        role: (authUser.role as any) || prev.role || 'student',
-      }));
-    }
-  }, [authUser]);
+  const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
     try {
@@ -458,107 +454,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsUpgradeModalOpen(false);
   };
 
-  // Helper to check if a specific action is within limits
+  // Helper to check if a specific action is within limits (all features enabled)
   const isFeatureAllowed = (
-    feature: 'create_book' | 'ai_builder' | 'ai_extractor' | 'create_class' | 'export_report' | 'quran_juz' | 'audio_recording' | 'join_class',
-    countOrJuz?: number
+    _feature: 'create_book' | 'ai_builder' | 'ai_extractor' | 'create_class' | 'export_report' | 'quran_juz' | 'audio_recording' | 'join_class',
+    _countOrJuz?: number
   ): { allowed: boolean; reason?: string; limit?: number; current?: number } => {
-    const isPro = userProfile.plan === 'premium' || userProfile.plan === 'institutional' || userProfile.role === 'admin' || userProfile.role === 'superadmin';
-    const limits = isPro ? tierConfig.premiumTier : tierConfig.freeTier;
-
-    switch (feature) {
-      case 'create_book': {
-        const userBooks = books.filter(b => !b.classId);
-        const allowed = isPro || userBooks.length < limits.maxBooks;
-        return {
-          allowed,
-          limit: limits.maxBooks,
-          current: userBooks.length,
-          reason: allowed ? undefined : (language === 'en' 
-            ? `Free plan limit is ${limits.maxBooks} books.` 
-            : `Batas pembuatan buku akun Free adalah ${limits.maxBooks} buku.`)
-        };
-      }
-      case 'ai_builder': {
-        const today = new Date().toISOString().split('T')[0];
-        const todayCount = dailyAIUsage.date === today ? dailyAIUsage.count : 0;
-        const allowed = isPro || todayCount < limits.maxDailyAIGenerations;
-        return {
-          allowed,
-          limit: limits.maxDailyAIGenerations,
-          current: todayCount,
-          reason: allowed ? undefined : (language === 'en'
-            ? `Daily AI limit is ${limits.maxDailyAIGenerations} generations per day.`
-            : `Kuota harian AI Builder akun Free adalah ${limits.maxDailyAIGenerations}x per hari.`)
-        };
-      }
-      case 'ai_extractor': {
-        const allowed = isPro || limits.allowAISmartExtractor;
-        return {
-          allowed,
-          reason: allowed ? undefined : (language === 'en'
-            ? 'Smart AI Extractor is exclusive to Unlupa Pro.'
-            : 'Fitur Smart AI Extractor tersedia eksklusif untuk pengguna Unlupa Pro.')
-        };
-      }
-      case 'create_class': {
-        const allowed = isPro || limits.allowCreateClass;
-        return {
-          allowed,
-          reason: allowed ? undefined : (language === 'en'
-            ? 'Creating classes & Teaching Mode requires Unlupa Pro.'
-            : 'Fitur pembuatan kelas & manajemen santri (Teaching Mode) memerlukan akun Unlupa Pro.')
-        };
-      }
-      case 'export_report': {
-        const allowed = isPro || limits.allowExportReport;
-        return {
-          allowed,
-          reason: allowed ? undefined : (language === 'en'
-            ? 'Report and transcript exports require Unlupa Pro.'
-            : 'Ekspor rapor dan laporan cetak memerlukan akun Unlupa Pro.')
-        };
-      }
-      case 'quran_juz': {
-        const activeJuzSet = new Set(quranPages.filter(p => p.isActive).map(p => p.juzNumber));
-        if (countOrJuz && activeJuzSet.has(countOrJuz)) {
-          return { allowed: true };
-        }
-        const allowed = isPro || activeJuzSet.size < limits.maxActiveQuranJuz;
-        return {
-          allowed,
-          limit: limits.maxActiveQuranJuz,
-          current: activeJuzSet.size,
-          reason: allowed ? undefined : (language === 'en'
-            ? `Free plan limit is ${limits.maxActiveQuranJuz} active Juz.`
-            : `Batas Juz aktif akun Free adalah ${limits.maxActiveQuranJuz} Juz.`)
-        };
-      }
-      case 'audio_recording': {
-        const allowed = isPro || (countOrJuz ?? 0) < limits.maxAudioRecordings;
-        return {
-          allowed,
-          limit: limits.maxAudioRecordings,
-          current: countOrJuz ?? 0,
-          reason: allowed ? undefined : (language === 'en'
-            ? `Free plan audio limit is ${limits.maxAudioRecordings} recordings.`
-            : `Batas rekaman audio suara akun Free adalah ${limits.maxAudioRecordings} rekaman.`)
-        };
-      }
-      case 'join_class': {
-        const allowed = isPro || myClasses.length < limits.maxJoinedClasses;
-        return {
-          allowed,
-          limit: limits.maxJoinedClasses,
-          current: myClasses.length,
-          reason: allowed ? undefined : (language === 'en'
-            ? `Free plan limit is ${limits.maxJoinedClasses} joined classes.`
-            : `Batas bergabung kelas akun Free adalah ${limits.maxJoinedClasses} kelas.`)
-        };
-      }
-      default:
-        return { allowed: true };
-    }
+    return { allowed: true };
   };
 
   // Professional Page Walkthrough & Onboarding State
@@ -947,7 +848,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           email: user.email || prev.email,
           fullName: user.displayName || user.email?.split('@')[0] || prev.fullName,
           avatarUrl: user.photoURL || prev.avatarUrl,
-          quranSpaceCode: `UNL-QRN-${targetId.slice(0, 4).toUpperCase()}`,
+          quranSpaceCode: `UNL-QRN-${String(targetId).slice(0, 4).toUpperCase()}`,
         }));
 
         // Switch to this account's isolated data (fresh accounts will start at 0)
@@ -1045,68 +946,293 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Sync Quran progress from PostgreSQL backend whenever token is active
-  useEffect(() => {
-    const token = useAuthStore.getState().token;
-    if (token) {
-      quranPageService.getPagesProgress()
-        .then(res => {
-          if (res && res.pages && res.pages.length > 0) {
-            setQuranPages(prev => prev.map(p => {
-              const serverPage = res.pages.find(sp => sp.page_number === p.pageNumber);
-              if (!serverPage) return p;
-              const isMapan = serverPage.status === 'mapan' || (serverPage.stability >= 74.5 || Math.round((serverPage.stability || 0) * 0.4025587) > 30);
-              const isAct = serverPage.status !== 'new';
-              return {
-                ...p,
-                isActive: isAct,
-                status: isMapan ? 'mastered_for_now' : (isAct ? 'active' : 'inactive'),
-                mapanCelebrated: isMapan,
-                fsrsData: {
-                  ...p.fsrsData,
-                  stability: serverPage.stability || 0,
-                  difficulty: serverPage.difficulty || 5.0,
-                  reps: serverPage.review_count || 0,
-                  nextReview: serverPage.next_review_at || (isAct ? new Date().toISOString() : null),
-                  state: isMapan ? 'mastered' : (serverPage.review_count > 0 ? 'review' : 'new'),
-                }
-              };
-            }));
-          }
-        })
-        .catch(err => console.warn("Failed to fetch quran progress:", err));
-    }
-  }, []);
-
-  // Fetch user books from PostgreSQL Backend
-  const fetchUserBooks = useCallback(async () => {
+  // Fetch Quran progress from PostgreSQL backend
+  const fetchQuranProgress = useCallback(async () => {
     const token = useAuthStore.getState().token;
     if (!token) return;
     try {
-      const res = await personalService.getBooks();
-      if (res && res.data) {
-        const serverBooks: Book[] = res.data.map((b: any) => ({
-          id: b.id,
-          userId: userProfile.id,
-          title: b.title,
-          description: b.description || '',
-          coverUrl: b.cover_image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
-          isPublic: b.is_public ?? false,
-          category: 'Umum',
-          isReadonly: false,
-          authorName: b.author?.name || userProfile.fullName,
-          createdAt: b.created_at || new Date().toISOString(),
-          updatedAt: b.updated_at || new Date().toISOString(),
-        }));
-        setBooks(prev => {
-          const otherBooks = prev.filter(p => !serverBooks.some(sb => sb.id === p.id));
-          return [...serverBooks, ...otherBooks];
+      const res = await quranPageService.getPagesProgress();
+      if (res && res.pages && Array.isArray(res.pages)) {
+        const cleanPages = generateCleanQuranPages();
+        const mappedPages = cleanPages.map(p => {
+          const serverPage = res.pages.find((sp: any) => sp.page_number === p.pageNumber);
+          if (!serverPage) return p;
+          const isMapan = serverPage.status === 'mapan' || (serverPage.stability >= 74.5 || Math.round((serverPage.stability || 0) * 0.4025587) > 30) || !!serverPage.has_reached_mapan;
+          const isAct = serverPage.status !== 'new';
+          return {
+            ...p,
+            isActive: isAct,
+            status: (isMapan ? 'mastered_for_now' : (isAct ? 'active' : 'inactive')) as 'inactive' | 'active' | 'mastered_for_now',
+            mapanCelebrated: isMapan || !!p.mapanCelebrated || !!serverPage.has_reached_mapan,
+            fsrsData: {
+              ...p.fsrsData,
+              stability: serverPage.stability || 0,
+              difficulty: serverPage.difficulty || 5.0,
+              reps: serverPage.review_count || 0,
+              nextReview: serverPage.next_review_at || (isAct ? new Date().toISOString() : null),
+              lastReview: serverPage.last_reviewed_at || null,
+              state: (isMapan ? 'mastered' : (serverPage.review_count > 0 ? 'review' : 'new')) as any,
+            }
+          };
         });
+        setQuranPages(mappedPages);
       }
+    } catch (err) {
+      console.warn("Failed to fetch quran progress:", err);
+    }
+  }, []);
+
+  // Fetch user books from PostgreSQL Backend (owned books + imported collection)
+  const fetchUserBooks = useCallback(async (overrideUid?: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) return;
+    try {
+      const [res, colRes] = await Promise.allSettled([
+        personalService.getBooks(),
+        personalService.getMyCollection(),
+      ]);
+
+      const uid = overrideUid || useAuthStore.getState().user?.id || userProfile.id;
+      const author = useAuthStore.getState().user?.name || userProfile.fullName;
+
+      const ownedBooks: Book[] = (res.status === 'fulfilled' && res.value?.data && Array.isArray(res.value.data))
+        ? res.value.data.map((b: any) => ({
+            id: b.id,
+            userId: uid,
+            title: b.title,
+            description: b.description || '',
+            coverUrl: b.cover_image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
+            isPublic: b.is_public ?? false,
+            category: 'Umum',
+            isReadonly: false,
+            authorName: b.author?.name || author,
+            createdAt: b.created_at || new Date().toISOString(),
+            updatedAt: b.updated_at || new Date().toISOString(),
+          }))
+        : [];
+
+      const collectionBooks: Book[] = (colRes.status === 'fulfilled' && colRes.value?.data && Array.isArray(colRes.value.data))
+        ? colRes.value.data.map((b: any) => ({
+            id: b.book_id,
+            userId: uid,
+            title: b.title,
+            description: b.description || '',
+            coverUrl: b.cover_image || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
+            isPublic: true,
+            category: 'Umum',
+            isReadonly: true,
+            authorName: b.owner_name || 'Penulis',
+            createdAt: b.added_at || new Date().toISOString(),
+            updatedAt: b.added_at || new Date().toISOString(),
+          }))
+        : [];
+
+      const combined: Book[] = [...ownedBooks];
+      for (const colBook of collectionBooks) {
+        if (!combined.some(b => b.id === colBook.id)) {
+          combined.push(colBook);
+        }
+      }
+      setBooks(combined);
     } catch (err) {
       console.warn("Failed to fetch books from backend:", err);
     }
   }, [userProfile.id, userProfile.fullName]);
+
+  const [library, setLibrary] = useState<LibraryEntry[]>(() => {
+    const saved = localStorage.getItem('ai_quran_library');
+    if (saved) {
+      try { 
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Filter out legacy dummy sample books
+          const clean = parsed.filter((p: any) => p && !String(p.id).startsWith('lib-') && !String(p.book?.id).startsWith('lib-book-'));
+          return clean;
+        }
+      } catch (e) { }
+    }
+    return [];
+  });
+
+  const fetchPublishedLibrary = useCallback(async () => {
+    const token = useAuthStore.getState().token;
+    if (!token) return;
+    try {
+      const res = await personalService.getPublishedBooks();
+      const booksData = res?.data || [];
+      const libraryEntries: LibraryEntry[] = booksData.map((b: any) => ({
+        id: b.id,
+        book: {
+          id: b.id,
+          userId: b.owner_id || '',
+          title: b.title || 'Untitled Book',
+          description: b.description || '',
+          coverUrl: b.cover_image || '',
+          isPublic: true,
+          isReadonly: false,
+          authorName: b.owner_name || 'Penulis',
+          category: b.category || 'Umum',
+          price: b.price || 0,
+          createdAt: b.created_at || new Date().toISOString(),
+          updatedAt: b.updated_at || new Date().toISOString(),
+        },
+        chapters: [],
+        items: [],
+        downloads: b.total_added || 0,
+        rating: 5.0,
+        curator: b.owner_name || 'Penulis Terverifikasi',
+        verified: true,
+      }));
+      setLibrary(libraryEntries);
+    } catch (e) {
+      console.warn('Failed to load published library from backend API', e);
+    }
+  }, []);
+
+  const fetchClasses = useCallback(async () => {
+    const token = useAuthStore.getState().token;
+    if (!token) return;
+    const authState = useAuthStore.getState().user;
+    const currentRole = (authState?.role as string) || (userProfile?.role as string) || 'student';
+    const isTeacherUser = currentRole === 'teacher' || currentRole === 'admin' || currentRole === 'superadmin';
+
+    try {
+      if (isTeacherUser) {
+        const teacherClasses = await classroomService.getMyClassesTeacher();
+        if (Array.isArray(teacherClasses)) {
+          const mapped: ClassGroup[] = teacherClasses.map(c => ({
+            id: c.id,
+            teacherId: c.guru_id || authState?.id || userProfile.id,
+            teacherName: c.owner_name || authState?.name || userProfile.fullName,
+            name: c.name,
+            code: c.class_code,
+            type: c.type === 'quran' ? 'quran' : 'non-quran',
+            description: c.description || '',
+            coverUrl: c.cover_image || undefined,
+            requiredJuzList: c.type === 'quran' ? [1, 2, 3, 4, 5] : undefined,
+            assignedBookIds: [],
+            students: [],
+            createdAt: c.created_at || new Date().toISOString(),
+            status: c.is_active ? 'active' : 'closed',
+          }));
+          setTeachingClasses(mapped);
+        }
+      }
+
+      const joinedClasses = await classroomService.getMyJoinedClass();
+      if (Array.isArray(joinedClasses)) {
+        const mappedJoined: ClassGroup[] = joinedClasses.map(c => ({
+          id: c.id,
+          teacherId: c.guru_id || '',
+          teacherName: c.owner_name || 'Guru / Ustadz',
+          name: c.name,
+          code: c.class_code,
+          type: c.type === 'quran' ? 'quran' : 'non-quran',
+          description: c.description || '',
+          coverUrl: c.cover_image || undefined,
+          requiredJuzList: c.type === 'quran' ? [1, 2, 3, 4, 5] : undefined,
+          assignedBookIds: [],
+          students: [],
+          createdAt: c.created_at || new Date().toISOString(),
+          status: c.is_active ? 'active' : 'closed',
+        }));
+        setMyClasses(mappedJoined);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch classes from backend API:", err);
+    }
+  }, [userProfile.role, userProfile.id, userProfile.fullName]);
+
+  const fetchClassMembers = useCallback(async (classId: string) => {
+    if (!classId) return;
+    try {
+      const members = await classroomService.getClassMember(classId);
+      if (Array.isArray(members)) {
+        const mappedStudents: ClassStudent[] = members.map(m => ({
+          id: m.user_id,
+          name: m.full_name || m.email || 'Santri',
+          email: m.email || '',
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.email || m.full_name || m.user_id)}`,
+          activeItemsCount: 0,
+          dueTodayCount: 0,
+          averageStability: 0,
+          lastActive: m.joined_at ? new Date(m.joined_at).toLocaleDateString('id-ID') : 'Aktif',
+          retentionRate: 100,
+          frequentStruggles: [],
+          teacherFeedbacks: [],
+        }));
+        setTeachingClasses(prev => prev.map(cls => cls.id === classId ? {
+          ...cls,
+          students: mappedStudents
+        } : cls));
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch members for class ${classId}:`, err);
+    }
+  }, []);
+
+  // React to authUser / token changes (PostgreSQL JWT login/switch/logout)
+  useEffect(() => {
+    const currentUserId = authUser?.id || 'guest';
+    if (authUser && authUser.id) {
+      const targetId = authUser.id;
+      if (loadedUserIdRef.current !== targetId) {
+        loadedUserIdRef.current = targetId;
+
+        setUserProfile({
+          id: targetId,
+          quranSpaceCode: `UNL-QRN-${String(targetId).slice(0, 4).toUpperCase()}`,
+          fullName: authUser.name || 'Santri',
+          email: authUser.email || '',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+          plan: authUser.is_premium ? 'premium' : 'free',
+          role: (authUser.role as any) || 'student',
+          onboardingPreferences: defaultOnboardingPreferences,
+        });
+
+        // Load isolated user data (clean state for fresh accounts)
+        const accountData = loadUserData(targetId);
+        setQuranPages(accountData.quranPages);
+        setBooks(accountData.books);
+        setChapters(accountData.chapters);
+        setItems(accountData.items);
+        setMyClasses(accountData.myClasses);
+        setTeachingClasses(accountData.teachingClasses);
+        setTeacherFeedbacks(accountData.teacherFeedbacks);
+        setAttendanceExceptions(accountData.attendanceExceptions);
+
+        // Fetch fresh server data from PostgreSQL backend for this user
+        fetchUserBooks(targetId);
+        fetchQuranProgress();
+        fetchPublishedLibrary();
+        fetchClasses();
+      } else {
+        // Same user ID, but token or role might have refreshed
+        fetchClasses();
+      }
+    } else if (!authUser && loadedUserIdRef.current && loadedUserIdRef.current !== 'guest') {
+      loadedUserIdRef.current = 'guest';
+      const guestProfile: UserProfile = {
+        id: 'guest',
+        quranSpaceCode: 'UNL-QRN-GUEST',
+        fullName: 'Tamu / Murid',
+        email: '',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        plan: 'free',
+        onboardingPreferences: defaultOnboardingPreferences,
+      };
+      setUserProfile(guestProfile);
+      const guestData = loadUserData('guest');
+      setQuranPages(guestData.quranPages);
+      setBooks(guestData.books);
+      setChapters(guestData.chapters);
+      setItems(guestData.items);
+      setMyClasses(guestData.myClasses);
+      setTeachingClasses(guestData.teachingClasses);
+      setTeacherFeedbacks(guestData.teacherFeedbacks);
+      setAttendanceExceptions(guestData.attendanceExceptions);
+    }
+  }, [authUser, token, fetchUserBooks, fetchQuranProgress, fetchPublishedLibrary, fetchClasses]);
 
   // Load hierarchical Book Tree (Book -> Module -> Submodule / Card)
   const loadBookTree = useCallback(async (bookId: string) => {
@@ -1133,11 +1259,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (Array.isArray(mod.items)) {
             mod.items.forEach((item: any) => {
               const isAct = item.status === 'fsrs_active' || item.status === 'interval' || item.is_active || false;
+              const qText = item.question || item.content || item.title || '';
               flattenedItems.push({
                 id: item.id,
                 bookId: currentBookId,
                 chapterId: mod.id,
-                question: item.question || '',
+                question: qText,
                 answer: item.answer || '',
                 imageQ: item.image || item.image_url || undefined,
                 imageA: undefined,
@@ -1174,11 +1301,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (Array.isArray(tree.items)) {
           tree.items.forEach((item: any) => {
             const isAct = item.status === 'fsrs_active' || item.status === 'interval' || item.is_active || false;
+            const qText = item.question || item.content || item.title || '';
             flattenedItems.push({
               id: item.id,
               bookId: currentBookId,
               chapterId: undefined,
-              question: item.question || '',
+              question: qText,
               answer: item.answer || '',
               imageQ: item.image || item.image_url || undefined,
               imageA: undefined,
@@ -1209,49 +1337,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     void fetchUserBooks();
-  }, [fetchUserBooks]);
+    void fetchClasses();
+  }, [fetchUserBooks, fetchClasses]);
 
-  const [library, setLibrary] = useState<LibraryEntry[]>(() => {
-    const saved = localStorage.getItem('ai_quran_library');
-    if (saved) {
-      try { 
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) { }
-    }
-    return CURATED_LIBRARY;
-  });
-  
   useEffect(() => {
     localStorage.setItem('ai_quran_library', JSON.stringify(library));
   }, [library]);
 
-  // Load public library from Firestore on mount
   useEffect(() => {
-    let isMounted = true;
-    const loadPublicLibrary = async () => {
-      try {
-        const fetched = await fetchPublicLibrary();
-        if (isMounted && fetched && fetched.length > 0) {
-          // Merge with CURATED_LIBRARY (or local ones) prioritizing firestore
-          setLibrary(prev => {
-            const merged = [...fetched];
-            const fetchedIds = new Set(fetched.map(f => f.id));
-            prev.forEach(p => {
-              if (!fetchedIds.has(p.id)) {
-                merged.push(p);
-              }
-            });
-            return merged;
-          });
-        }
-      } catch (e) {
-        console.warn('Failed to load public library from Firestore', e);
-      }
-    };
-    loadPublicLibrary();
-    return () => { isMounted = false; };
-  }, []);
+    void fetchPublishedLibrary();
+  }, [fetchPublishedLibrary]);
 
   // Sync to localStorage scoped by user
   useEffect(() => {
@@ -1659,6 +1754,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         ...p,
+        isActive: true,
         status: res.isMasteredForNow ? 'mastered_for_now' : 'active',
         mapanCelebrated: p.mapanCelebrated || justBecameMastered || res.isMasteredForNow,
         fsrsData: res.newState,
@@ -1921,8 +2017,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteBook = async (id: string) => {
+    const targetBook = books.find(b => b.id === id);
     try {
-      await personalService.deleteBook(id);
+      if (targetBook?.isReadonly) {
+        await personalService.removeFromMyCollection(id);
+      } else {
+        await personalService.deleteBook(id);
+      }
     } catch (err) {
       console.warn("Backend deleteBook failed:", err);
     }
@@ -2190,15 +2291,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Library & Import/Export
-  const importFromLibrary = (libId: string) => {
+  const importFromLibrary = async (libId: string) => {
     const entry = library.find(l => l.id === libId);
     if (!entry) return;
 
     // Check if already imported
-    const alreadyImported = books.some(b => b.id === entry.book.id);
+    const alreadyImported = books.some(b => b.id === entry.book.id || (b.title && b.title === entry.book.title));
     if (alreadyImported) {
-      alert('This book is already in your Personal Space!');
+      alert(language === 'en' ? 'This book is already in your Personal Space!' : 'Kitab ini sudah ada di Ruang Pribadi Anda!');
       return;
+    }
+
+    try {
+      if (entry.book?.id) {
+        await personalService.addPublishedBookToMyBooks(entry.book.id);
+        await fetchUserBooks();
+        await fetchPublishedLibrary();
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend addPublishedBookToMyBooks error, fallback to local state:', err);
     }
 
     // Reset-on-clone: initialize card activation and FSRS data to 'new' (unactivated state)
@@ -2260,58 +2372,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  
   const publishBookToLibrary = async (
     bookId: string, 
     allowEdit = false, 
-    pricing?: { isPaid: boolean; price?: number }
+    _pricing?: { isPaid: boolean; price?: number }
   ) => {
-    const book = books.find(b => b.id === bookId);
-    if (!book) return { success: false, message: 'Book not found' };
-    
-    // Check if already in library
-    if (library.some(l => l.book.id === bookId)) {
-      return { success: false, message: language === 'en' ? 'Book is already in the library' : 'Kitab ini sudah ada di Pustaka' };
+    try {
+      await personalService.requestPublishBook(bookId, { is_editable: allowEdit });
+      setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isPublic: true } : b));
+      await fetchUserBooks();
+      await fetchPublishedLibrary();
+      return { 
+        success: true, 
+        message: language === 'en' 
+          ? 'Alhamdulillah, book publication submitted successfully!' 
+          : 'Alhamdulillah, pengajuan publikasi kitab berhasil dikirim!' 
+      };
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Gagal mempublikasikan kitab';
+      return {
+        success: false,
+        message: msg
+      };
     }
-    
-    const bookChapters = chapters.filter(c => c.bookId === bookId);
-    const bookItems: BookItem[] = items.filter(i => i.bookId === bookId).map(i => ({
-      ...i,
-      isActive: false,
-      status: 'inactive' as const,
-      fsrsData: createInitialFSRSState()
-    }));
-
-    const isPaid = Boolean(pricing?.isPaid && (pricing.price || 0) > 0);
-    const priceAmount = isPaid ? (pricing?.price || 0) : 0;
-    
-    const newEntry = {
-      id: `lib-${Date.now()}`,
-      title: book.title,
-      description: book.description || 'Community published book',
-      category: book.category || 'Community',
-      curator: book.authorName || 'Penulis Pribadi',
-      downloads: 0,
-      rating: 5.0,
-      verified: true,
-      book: { 
-        ...book, 
-        isReadonly: !allowEdit,
-        price: priceAmount,
-        isPublic: true
-      },
-      chapters: bookChapters,
-      items: bookItems,
-      tags: ['community']
-    };
-    
-    setLibrary(prev => [newEntry, ...prev]);
-    return { 
-      success: true, 
-      message: language === 'en' 
-        ? 'Alhamdulillah, book successfully published to Library!' 
-        : 'Alhamdulillah, kitab berhasil dipublikasikan ke Pustaka!' 
-    };
   };
 
   const exportBookJSON = (bookId: string): string => {
@@ -2333,25 +2416,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   const joinClassByCode = async (code: string): Promise<{ success: boolean; message: string }> => {
-    const cleanCode = code.trim().toUpperCase();
+    const cleanCode = code.trim().toUpperCase().replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
     if (!cleanCode) {
       return { success: false, message: language === 'en' ? 'Class code cannot be empty.' : 'Kode kelas tidak boleh kosong.' };
     }
 
-    // 1. Find the class globally by code in Firestore, or local teachingClasses fallback
-    let targetClass = teachingClasses.find(c => c.code.toUpperCase() === cleanCode);
+    const token = useAuthStore.getState().token;
+    let backendClassItem: any = null;
+    let backendJoinedSuccess = false;
+
+    if (token) {
+      try {
+        backendClassItem = await classroomService.joinClass({ code: cleanCode });
+        backendJoinedSuccess = true;
+        await fetchClasses();
+      } catch (apiErr: any) {
+        const errMsg = apiErr?.response?.data?.message || apiErr?.message || '';
+        if (errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('sudah bergabung') || errMsg.toLowerCase().includes('member')) {
+          return { success: false, message: language === 'en' ? 'You have already joined this class.' : 'Anda sudah bergabung di kelas ini.' };
+        }
+        if (errMsg.toLowerCase().includes('own class') || errMsg.toLowerCase().includes('kelas sendiri')) {
+          return { success: false, message: language === 'en' ? 'You cannot join your own class.' : 'Anda tidak dapat bergabung ke kelas milik Anda sendiri.' };
+        }
+        if (errMsg.toLowerCase().includes('not active') || errMsg.toLowerCase().includes('tidak aktif')) {
+          return { success: false, message: language === 'en' ? 'This class is no longer active.' : 'Kelas ini sudah tidak aktif.' };
+        }
+      }
+    }
+
+    const normalizeCompare = (c?: string) => (c || '').trim().toUpperCase().replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
+
+    // 1. Find the class globally by code in backend response, teachingClasses, myClasses, or Firestore
+    let targetClass: ClassGroup | null = null;
+
+    if (backendClassItem && backendClassItem.id) {
+      targetClass = {
+        id: backendClassItem.id,
+        teacherId: backendClassItem.guru_id || '',
+        teacherName: backendClassItem.owner_name || 'Guru / Ustadz',
+        name: backendClassItem.name,
+        code: backendClassItem.class_code || cleanCode,
+        type: backendClassItem.type === 'quran' ? 'quran' : 'non-quran',
+        description: backendClassItem.description || '',
+        coverUrl: backendClassItem.cover_image || undefined,
+        requiredJuzList: backendClassItem.type === 'quran' ? [1, 2, 3, 4, 5] : undefined,
+        assignedBookIds: [],
+        students: [],
+        createdAt: backendClassItem.created_at || new Date().toISOString(),
+        status: backendClassItem.is_active ? 'active' : 'closed',
+      };
+    }
+
+    if (!targetClass) {
+      targetClass = teachingClasses.find(c => normalizeCompare(c.code) === cleanCode) || null;
+    }
+
+    if (!targetClass) {
+      targetClass = myClasses.find(c => normalizeCompare(c.code) === cleanCode) || null;
+    }
+
     if (!targetClass) {
       targetClass = await findClassByCodeGlobal(cleanCode);
     }
     
     if (!targetClass) {
+      if (backendJoinedSuccess) {
+        return { 
+          success: true, 
+          message: language === 'en' ? 'Successfully joined class!' : 'Berhasil bergabung dengan kelas!' 
+        };
+      }
       return { success: false, message: language === 'en' ? 'Class not found.' : 'Kelas tidak ditemukan.' };
     }
 
-    // 2. Check if user is already in that class
-    const alreadyEnrolled = myClasses.some(c => c.id === targetClass.id) || targetClass.students.some(s => s.quranSpaceCode === quranSpaceCode || s.id === `std-user-${userProfile.id}`);
-    if (alreadyEnrolled) {
-      return { success: false, message: language === 'en' ? 'You have already joined this class.' : 'Anda sudah bergabung di kelas ini.' };
+    // 2. Check if user is already in that class (only if not newly joined via backend in this turn)
+    if (!backendJoinedSuccess) {
+      const alreadyEnrolled = myClasses.some(c => c.id === targetClass.id) || (targetClass.students || []).some(s => s.quranSpaceCode === quranSpaceCode || s.id === `std-user-${userProfile.id}`);
+      if (alreadyEnrolled) {
+        return { success: false, message: language === 'en' ? 'You have already joined this class.' : 'Anda sudah bergabung di kelas ini.' };
+      }
     }
 
     // 3. Create student representation of the current user
@@ -2490,10 +2633,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           students: [userStudent, ...cls.students]
         };
       }));
-    } else {
-      // Note: We no longer monolithically update the teacher's teaching_classes array here
-      // to avoid race conditions when multiple students join at the exact same time.
-      // The teacher will see the student via fetchClassStudentsGlobal() on mount or refresh.
     }
 
     // 5. Enroll in Global Class (so it is visible to Teacher pulling from global)
@@ -2523,9 +2662,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     assignedBookIds?: string[];
   }): ClassGroup => {
     const rawCode = data.code?.trim().toUpperCase();
-    const finalCode = rawCode || `${data.type === 'quran' ? 'QRN' : 'CLS'}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalCode = rawCode || `${data.type === 'quran' ? 'QRN' : 'BOOK'}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const tempId = `cls-${Date.now()}`;
     const newClass: ClassGroup = {
-      id: `cls-${Date.now()}`,
+      id: tempId,
       teacherId: userProfile.id,
       teacherName: userProfile.fullName,
       name: data.name,
@@ -2539,10 +2679,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     
+    // Optimistic local update
+    setTeachingClasses(prev => [newClass, ...prev]);
+
+    // Backend API sync
+    const token = useAuthStore.getState().token;
+    if (token) {
+      classroomService.createClass({
+        name: data.name,
+        description: data.description || '',
+        type: data.type === 'quran' ? 'quran' : 'book',
+        cover_image: data.coverUrl,
+      }).then(async (createdServerClass) => {
+        if (createdServerClass && createdServerClass.id) {
+          setTeachingClasses(prev => prev.map(c => c.id === tempId ? {
+            ...c,
+            id: createdServerClass.id,
+            code: createdServerClass.class_code || c.code,
+            coverUrl: createdServerClass.cover_image || c.coverUrl,
+          } : c));
+
+          if (data.type === 'non-quran' && data.assignedBookIds && data.assignedBookIds.length > 0) {
+            for (let i = 0; i < data.assignedBookIds.length; i++) {
+              try {
+                await classroomService.addBookToClass(createdServerClass.id, {
+                  book_id: data.assignedBookIds[i],
+                  order: i + 1,
+                });
+              } catch (e) {
+                console.warn('Failed to add book to class on backend:', e);
+              }
+            }
+          }
+        }
+      }).catch(err => {
+        console.warn("Failed to create class on backend API:", err);
+      });
+    }
+
     // Sync class globally so other users can discover it by code
     syncClassToGlobal(newClass);
     
-    setTeachingClasses(prev => [newClass, ...prev]);
     return newClass;
   };
 
@@ -2563,6 +2740,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteTeachingClass = (classId: string) => {
     triggerClassCleanup(classId, { action: 'delete' });
+    const token = useAuthStore.getState().token;
+    if (token && !classId.startsWith('cls-')) {
+      classroomService.deleteClass(classId).catch(err => {
+        console.warn("Failed to delete class on backend API:", err);
+      });
+    }
   };
 
   const closeTeachingClass = (classId: string) => {
@@ -2575,29 +2758,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTeachingClass = (id: string, data: Partial<ClassGroup>) => {
     setTeachingClasses(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    const token = useAuthStore.getState().token;
+    if (token && !id.startsWith('cls-')) {
+      classroomService.updateClass(id, {
+        name: data.name,
+        description: data.description,
+        type: data.type === 'quran' ? 'quran' : 'book',
+        cover_image: data.coverUrl,
+      }).catch(err => console.warn('Failed to update class on backend:', err));
+    }
   };
 
   const leaveClass = (classId: string) => {
     removeStudentFromGlobalClass(classId, `std-user-${userProfile.id}`);
+    removeStudentFromGlobalClass(classId, userProfile.id);
     setMyClasses(prev => prev.filter(c => c.id !== classId));
     setBooks(prev => prev.filter(b => b.classId !== classId && !b.id.startsWith(`class-book-${classId}-`)));
     setChapters(prev => prev.filter(c => !c.bookId.startsWith(`class-book-${classId}-`)));
     setItems(prev => prev.filter(i => !i.bookId.startsWith(`class-book-${classId}-`)));
-    
-    // Find the class to leave to get the teacherId
-    const clsToLeave = myClasses.find(c => c.id === classId);
-    
-    if (clsToLeave && clsToLeave.teacherId !== userProfile.id) {
-       // The global removal via removeStudentFromGlobalClass is sufficient.
-    }
 
     setTeachingClasses(prev => prev.map(cls => {
       if (cls.id !== classId) return cls;
       return {
         ...cls,
-        students: cls.students.filter(s => s.quranSpaceCode !== quranSpaceCode && s.id !== `std-user-${userProfile.id}`)
+        students: cls.students.filter(s => 
+          s.quranSpaceCode !== quranSpaceCode && 
+          s.id !== `std-user-${userProfile.id}` && 
+          s.id !== userProfile.id &&
+          s.email !== userProfile.email
+        )
       };
     }));
+
+    const token = useAuthStore.getState().token;
+    if (token && !classId.startsWith('cls-')) {
+      classroomService.leaveClass(classId)
+        .then(() => {
+          void fetchClasses();
+        })
+        .catch(err => console.warn('Failed to leave class on backend:', err));
+    }
   };
 
   const removeStudentFromClass = (classId: string, studentId: string) => {
@@ -3267,7 +3467,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createBook, updateBook, deleteBook, duplicateBookAsEditable,
       createChapter, updateChapter, deleteChapter,
       createItem, updateItem, deleteItem, reorderItems,
-      loadBookTree, fetchUserBooks,
+      loadBookTree, fetchUserBooks, fetchPublishedLibrary,
+      fetchClasses, fetchClassMembers,
       importFromLibrary, importFromJSON, exportBookJSON, publishBookToLibrary, library,
       
       transactions, purchasedBookIds, isBookPurchased, purchaseBook, subscribeToPro,

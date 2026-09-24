@@ -128,6 +128,8 @@ export const SidebarRoleSwitcher = ({ onClose }: SidebarRoleSwitcherProps) => {
                     onClose?.();
                     if (role === "student") {
                       navigate("/dashboard/alquran");
+                    } else if (role === "teacher") {
+                      navigate("/dashboard/kelas");
                     } else {
                       navigate("/dashboard");
                     }

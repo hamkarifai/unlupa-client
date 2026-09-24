@@ -31,6 +31,7 @@ interface Props {
   onInlineReview?: (pageNumber: number, rating: 1 | 2 | 3 | 4) => void;
   isJustReviewed?: boolean;
   justReviewedRating?: 1 | 2 | 3 | 4;
+  isReadOnly?: boolean;
 }
 
 export const QuranPageCard: React.FC<Props> = ({
@@ -42,9 +43,11 @@ export const QuranPageCard: React.FC<Props> = ({
   onOpenMushafViewer,
   onInlineReview,
   isJustReviewed,
-  justReviewedRating
+  justReviewedRating,
+  isReadOnly = false
 }) => {
-  const { isTeacherMode, activeSpace } = useApp();
+  const { isTeacherMode, isReadOnlyMode, activeSpace } = useApp();
+  const effectiveReadOnly = isReadOnly || isReadOnlyMode;
   const isTeacher = isTeacherMode || activeSpace === 'teaching';
   const [showAudio, setShowAudio] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
@@ -123,13 +126,18 @@ export const QuranPageCard: React.FC<Props> = ({
           {/* Play / Active Power Button */}
           <button
             type="button"
-            onClick={() => onToggleActive(page.pageNumber)}
-            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 ${
+            onClick={() => !effectiveReadOnly && onToggleActive(page.pageNumber)}
+            disabled={effectiveReadOnly}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-2xs shrink-0 ${
+              effectiveReadOnly 
+                ? 'cursor-default' 
+                : 'cursor-pointer hover:scale-105 active:scale-95'
+            } ${
               page.isActive
-                ? 'bg-blue-700 dark:bg-blue-800 text-white hover:scale-105 active:scale-95'
-                : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-100 hover:text-blue-800'
+                ? 'bg-blue-700 dark:bg-blue-800 text-white'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
             }`}
-            title={page.isActive ? (language === 'en' ? 'Deactivate Page' : 'Nonaktifkan Halaman') : (language === 'en' ? 'Activate Page' : 'Aktivasi Halaman')}
+            title={page.isActive ? (language === 'en' ? 'Active Page' : 'Halaman Aktif') : (language === 'en' ? 'Inactive Page' : 'Halaman Belum Aktif')}
           >
             {page.isActive ? (
               <Play className="w-3 h-3 fill-white ml-0.5" />
@@ -271,74 +279,100 @@ export const QuranPageCard: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Quick 1-Click Action Buttons: 4 Standard FSRS Ratings when Due, or Reviewed Badge when not due */}
-          {isDueToday ? (
+          {/* Quick 1-Click Action Buttons or Read-Only Status Indicator */}
+          {effectiveReadOnly ? (
             <div className="flex items-center gap-1 shrink-0">
-              {/* Rating 1: Again (Banyak Lupa) */}
-              <button
-                type="button"
-                onClick={() => onInlineReview && onInlineReview(page.pageNumber, 1)}
-                disabled={!onInlineReview}
-                className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs ${
-                  isJustReviewed && justReviewedRating === 1
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-sm scale-105 cursor-default'
-                    : 'border-rose-300 dark:border-rose-800 bg-rose-50/90 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 hover:bg-rose-100 hover:border-rose-400 font-bold cursor-pointer active:scale-95'
-                }`}
-                title="1 • Again (Banyak Lupa / Ulangi)"
-              >
-                <span className="text-[8.5px] font-semibold text-rose-600 dark:text-rose-400 leading-none">1h</span>
-                <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Again</span>
-              </button>
-
-              {/* Rating 2: Hard (Kurang Lancar) */}
-              <button
-                type="button"
-                onClick={() => onInlineReview && onInlineReview(page.pageNumber, 2)}
-                disabled={!onInlineReview}
-                className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs ${
-                  isJustReviewed && justReviewedRating === 2
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-sm scale-105 cursor-default'
-                    : 'border-amber-300 dark:border-amber-800 bg-amber-50/90 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 hover:border-amber-400 font-bold cursor-pointer active:scale-95'
-                }`}
-                title="2 • Hard (Kurang Lancar)"
-              >
-                <span className="text-[8.5px] font-semibold text-amber-600 dark:text-amber-400 leading-none">Sedang</span>
-                <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Hard</span>
-              </button>
-
-              {/* Rating 3: Good (Lancar) */}
-              <button
-                type="button"
-                onClick={() => onInlineReview && onInlineReview(page.pageNumber, 3)}
-                disabled={!onInlineReview}
-                className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs ${
-                  isJustReviewed && justReviewedRating === 3
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm scale-105 cursor-default'
-                    : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 font-bold cursor-pointer active:scale-95'
-                }`}
-                title="3 • Good (Lancar)"
-              >
-                <span className="text-[8.5px] font-semibold text-emerald-600 dark:text-emerald-400 leading-none">Lancar</span>
-                <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Good</span>
-              </button>
-
-              {/* Rating 4: Easy (Sangat Fasih) */}
-              <button
-                type="button"
-                onClick={() => onInlineReview && onInlineReview(page.pageNumber, 4)}
-                disabled={!onInlineReview}
-                className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs ${
-                  isJustReviewed && justReviewedRating === 4
-                    ? 'bg-sky-600 text-white border-sky-600 shadow-sm scale-105 cursor-default'
-                    : 'border-sky-300 dark:border-sky-800 bg-sky-50/90 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 hover:bg-sky-100 hover:border-sky-400 font-bold cursor-pointer active:scale-95'
-                }`}
-                title="4 • Easy (Sangat Fasih)"
-              >
-                <span className="text-[8.5px] font-semibold text-sky-600 dark:text-sky-400 leading-none">Fasih</span>
-                <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Easy</span>
-              </button>
+              {isMapan ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 font-semibold text-[10.5px] shadow-2xs">
+                  <Sparkles className="w-3 h-3 text-indigo-500" />
+                  <span>{language === 'en' ? 'Mastered' : 'Mapan'}</span>
+                </span>
+              ) : isDueToday ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-800/80 text-amber-700 dark:text-amber-300 font-semibold text-[10.5px] shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>{language === 'en' ? 'Due Today' : 'Jatuh Tempo'}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 font-semibold text-[10.5px] shadow-2xs">
+                  <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>{language === 'en' ? 'Reviewed' : 'Sudah Direview'}</span>
+                </span>
+              )}
             </div>
-          ) : (
+          ) : isDueToday ? (() => {
+            const intervals = predictQuranIntervals(page.fsrsData, page.mapanSchedule);
+            const isRating3Unlocked = (page.fsrsData.stability || 0) > 30 || page.status === 'mastered_for_now' || !!page.mapanCelebrated;
+
+            return (
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Rating 1: Again (Banyak Lupa) */}
+                <button
+                  type="button"
+                  onClick={() => onInlineReview && onInlineReview(page.pageNumber, 1)}
+                  disabled={!onInlineReview}
+                  className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs ${
+                    isJustReviewed && justReviewedRating === 1
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm scale-105 cursor-default'
+                      : 'border-rose-300 dark:border-rose-800 bg-rose-50/90 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 hover:bg-rose-100 hover:border-rose-400 font-bold cursor-pointer active:scale-95'
+                  }`}
+                  title={`1 • Again (${intervals.needReviewDays}${language === 'en' ? 'd' : 'h'})`}
+                >
+                  <span className="text-[8.5px] font-semibold text-rose-600 dark:text-rose-400 leading-none">
+                    {intervals.needReviewDays}{language === 'en' ? 'd' : 'h'}
+                  </span>
+                  <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Again</span>
+                </button>
+
+                {/* Rating 2: Hard (Lancar) */}
+                <button
+                  type="button"
+                  onClick={() => onInlineReview && onInlineReview(page.pageNumber, 2)}
+                  disabled={!onInlineReview}
+                  className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs ${
+                    isJustReviewed && justReviewedRating === 2
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-105 cursor-default'
+                      : 'border-blue-300 dark:border-blue-800 bg-blue-50/90 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 hover:bg-blue-100 hover:border-blue-400 font-bold cursor-pointer active:scale-95'
+                  }`}
+                  title={`2 • Hard (${intervals.hardDays}${language === 'en' ? 'd' : 'h'})`}
+                >
+                  <span className="text-[8.5px] font-semibold text-blue-600 dark:text-blue-400 leading-none">
+                    {intervals.hardDays}{language === 'en' ? 'd' : 'h'}
+                  </span>
+                  <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Hard</span>
+                </button>
+
+                {/* Rating 3: Mutqin (Good) - Unlocked once stability > 30 days is ever reached */}
+                {isRating3Unlocked ? (
+                  <button
+                    type="button"
+                    onClick={() => onInlineReview && onInlineReview(page.pageNumber, 3)}
+                    disabled={!onInlineReview}
+                    className={`flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border text-center transition-all min-w-[34px] sm:min-w-[38px] shadow-2xs animate-in fade-in ${
+                      isJustReviewed && justReviewedRating === 3
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm scale-105 cursor-default'
+                        : 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 font-bold cursor-pointer active:scale-95'
+                    }`}
+                    title={`3 • Mutqin (${intervals.goodDays}${language === 'en' ? 'd' : 'h'})`}
+                  >
+                    <span className="text-[8.5px] font-semibold text-emerald-600 dark:text-emerald-400 leading-none">
+                      {intervals.goodDays}{language === 'en' ? 'd' : 'h'}
+                    </span>
+                    <span className="text-[10px] sm:text-[10.5px] font-bold leading-tight mt-0.5">Good</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="flex flex-col items-center justify-center py-0.5 px-1.5 sm:px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 cursor-not-allowed min-w-[34px] sm:min-w-[38px] shadow-2xs opacity-65 select-none"
+                    title={language === 'en' ? 'Locked: Requires memory stability > 30 days' : 'Terkunci: Memerlukan stabilitas memori > 30 hari'}
+                  >
+                    <Lock className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500 mb-0.5" />
+                    <span className="text-[9.5px] font-medium leading-none">Mutqin</span>
+                  </button>
+                )}
+              </div>
+            );
+          })() : (
             <div className="flex items-center gap-1 shrink-0">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 font-semibold text-[10.5px] shadow-2xs">
                 <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
@@ -353,14 +387,16 @@ export const QuranPageCard: React.FC<Props> = ({
           <span className="text-[11px] text-slate-400 dark:text-slate-500">
             {language === 'en' ? 'Not activated' : 'Belum diaktivasi'}
           </span>
-          <button
-            type="button"
-            onClick={() => onToggleActive(page.pageNumber)}
-            className="px-2.5 py-1 rounded-lg bg-blue-700 dark:bg-blue-800 hover:bg-blue-850 text-white text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer shadow-2xs active:scale-95"
-          >
-            <Plus className="w-3 h-3" />
-            <span>{language === 'en' ? 'Activate' : 'Aktivasi'}</span>
-          </button>
+          {!effectiveReadOnly && (
+            <button
+              type="button"
+              onClick={() => onToggleActive(page.pageNumber)}
+              className="px-2.5 py-1 rounded-lg bg-blue-700 dark:bg-blue-800 hover:bg-blue-850 text-white text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer shadow-2xs active:scale-95"
+            >
+              <Plus className="w-3 h-3" />
+              <span>{language === 'en' ? 'Activate' : 'Aktivasi'}</span>
+            </button>
+          )}
         </div>
       )}
 

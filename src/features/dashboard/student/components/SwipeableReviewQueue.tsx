@@ -7,6 +7,7 @@ import {
   BookOpen,
   Layers,
   RotateCcw,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/services/api";
@@ -32,7 +33,7 @@ export const SwipeableReviewQueue = ({
   const isFinished = !activeTask || currentIndex >= tasks.length;
   const remainingCount = Math.max(0, tasks.length - currentIndex);
 
-  const handleRating = async (rating: 1 | 2 | 3 | 4) => {
+  const handleRating = async (rating: 1 | 2 | 3) => {
     if (!activeTask || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -41,9 +42,8 @@ export const SwipeableReviewQueue = ({
 
       const ratingLabels = {
         1: "Diulang (Again)",
-        2: "Sulit (Hard)",
-        3: "Lancar (Good)",
-        4: "Sangat Mudah (Easy)",
+        2: "Lancar (Hard)",
+        3: "Mutqin (Good)",
       };
 
       toast.success(`Dinilai: ${ratingLabels[rating]}`, {
@@ -181,44 +181,54 @@ export const SwipeableReviewQueue = ({
               )}
             </div>
 
-            {/* FSRS 4 Rating Buttons */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-              <button
-                disabled={isSubmitting}
-                onClick={() => handleRating(1)}
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-600 dark:text-red-400 transition cursor-pointer disabled:opacity-50"
-              >
-                <span className="text-xs font-bold font-mono">1 • Again</span>
-                <span className="text-[10px] opacity-75">Lupa / Ulang</span>
-              </button>
+            {/* FSRS 1-3 Rating Buttons (Locked Rating 3 for Stability <= 30) */}
+            {(() => {
+              const isRating3Allowed = ((activeTask as any)?.stability || 0) > 30 || activeTask?.status === "graduate" || activeTask?.status === "mapan";
 
-              <button
-                disabled={isSubmitting}
-                onClick={() => handleRating(2)}
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 text-amber-600 dark:text-amber-400 transition cursor-pointer disabled:opacity-50"
-              >
-                <span className="text-xs font-bold font-mono">2 • Hard</span>
-                <span className="text-[10px] opacity-75">Terbata-bata</span>
-              </button>
+              return (
+                <div className="grid grid-cols-3 gap-2 pt-2">
+                  <button
+                    disabled={isSubmitting}
+                    onClick={() => handleRating(1)}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-600 dark:text-red-400 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="text-xs font-bold font-mono">1 • Again</span>
+                    <span className="text-[10px] opacity-75">Banyak Lupa</span>
+                  </button>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() => handleRating(3)}
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition cursor-pointer disabled:opacity-50"
-              >
-                <span className="text-xs font-bold font-mono">3 • Good</span>
-                <span className="text-[10px] opacity-75">Lancar</span>
-              </button>
+                  <button
+                    disabled={isSubmitting}
+                    onClick={() => handleRating(2)}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/15 text-blue-600 dark:text-blue-400 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="text-xs font-bold font-mono">2 • Hard</span>
+                    <span className="text-[10px] opacity-75">Lancar</span>
+                  </button>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() => handleRating(4)}
-                className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-sky-500/20 bg-sky-500/5 hover:bg-sky-500/15 text-sky-600 dark:text-sky-400 transition cursor-pointer disabled:opacity-50"
-              >
-                <span className="text-xs font-bold font-mono">4 • Easy</span>
-                <span className="text-[10px] opacity-75">Sangat Fasih</span>
-              </button>
-            </div>
+                  {isRating3Allowed ? (
+                    <button
+                      disabled={isSubmitting}
+                      onClick={() => handleRating(3)}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <span className="text-xs font-bold font-mono">3 • Mutqin</span>
+                      <span className="text-[10px] opacity-75">Lancar Mantap</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-border/50 bg-surface-1/50 text-muted-foreground/60 cursor-not-allowed opacity-60 select-none"
+                      title="Terkunci: Memerlukan stabilitas > 30 hari"
+                    >
+                      <Lock className="w-3.5 h-3.5 mb-0.5 opacity-70" />
+                      <span className="text-xs font-bold font-mono">Mutqin</span>
+                      <span className="text-[9px] opacity-75">&gt;30 Hari</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </motion.div>
         </AnimatePresence>
       </div>
