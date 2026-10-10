@@ -17,6 +17,7 @@ import {
   Crown,
   Star,
   ChevronDown,
+  X,
 } from "../foundations/hugeicons";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
@@ -34,7 +35,6 @@ export const LandingPage: React.FC = () => {
   const {
     setIsLandingPageOpen,
     setActiveSpace,
-    openUpgradeModal,
     quranPages,
     items,
     language,
@@ -46,6 +46,7 @@ export const LandingPage: React.FC = () => {
 
   // Interactive FAQ Open State
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [isProNoticeOpen, setIsProNoticeOpen] = useState(false);
 
   // Handlers
   const handleLaunchApp = (targetSpace: AppSpace = "dashboard") => {
@@ -55,10 +56,7 @@ export const LandingPage: React.FC = () => {
   };
 
   const handleOpenPro = () => {
-    openUpgradeModal(
-      "Landing Page Showcase",
-      "Upgrade ke Unlupa Pro untuk membuka seluruh 30 Juz Al-Qur'an (604 Halaman), AI Audio Tasmi', Ruang Kelas santri tanpa batas, dan cetak sertifikat resmi.",
-    );
+    setIsProNoticeOpen(true);
   };
 
   const faqs = [
@@ -86,6 +84,59 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] dark:bg-[#0B1120] text-[#1B254B] dark:text-[#F8FAFC] font-sans selection:bg-[#FF6F3D]/20 selection:text-[#FF6F3D] transition-colors">
+      <AnimatePresence>
+        {isProNoticeOpen && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setIsProNoticeOpen(false);
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pro-notice-title"
+              className="relative w-full max-w-md overflow-hidden rounded-2xl border border-amber-200/70 bg-[#EEF2F7] p-7 text-center shadow-2xl dark:border-amber-500/20 dark:bg-[#111827]"
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsProNoticeOpen(false)}
+                aria-label="Tutup"
+                className="absolute right-4 top-4 rounded-lg p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shadow-inner dark:bg-amber-500/15 dark:text-amber-300">
+                <Crown className="h-7 w-7" />
+              </div>
+              <p className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-300">
+                Unlupa Pro
+              </p>
+              <h2 id="pro-notice-title" className="text-xl font-black text-[#1B254B] dark:text-white">
+                Segera hadir
+              </h2>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-[#707E94] dark:text-slate-300">
+                Fitur ini masih dalam tahap pengembangan. Kami sedang menyiapkan pengalaman Pro untuk Anda.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsProNoticeOpen(false)}
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-[#FF6F3D] px-5 py-3 text-sm font-bold text-white shadow-md shadow-[#FF6F3D]/20 transition hover:bg-[#E65320]"
+              >
+                Mengerti
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* ============================================================
           1. STICKY TOP LUMINOUS CLAYMORPHIC NAVIGATION BAR
           Strict 3-Zone Contract: Brand Wordmark | Nav Links | Actions
@@ -143,6 +194,10 @@ export const LandingPage: React.FC = () => {
             </a>
             <a
               href="#unlupa-pro"
+              onClick={(event) => {
+                event.preventDefault();
+                handleOpenPro();
+              }}
               className="hover:text-[#FF6F3D] transition-colors flex items-center gap-1 text-[#FF6F3D]"
             >
               <Crown className="w-3.5 h-3.5 fill-[#FF6F3D]" />
@@ -155,37 +210,10 @@ export const LandingPage: React.FC = () => {
 
           {/* Zone 3: Primary Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Masuk dengan Gmail */}
-            <button
-              onClick={() => navigate("/login")}
-              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 hover:scale-105 active:scale-95 transition-all shadow-2xs cursor-pointer"
-              title="Masuk dengan Akun Google / Gmail"
-            >
-              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.19v3.15C3.17 21.3 7.22 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.19C.43 8.1 0 9.8 0 12s.43 3.9 1.19 5.42l4.09-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.17 2.7 1.19 6.58l4.09 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>Masuk Gmail</span>
-            </button>
-
             {/* Login */}
             <button
               onClick={() => navigate("/login")}
-              className="px-3.5 py-2 rounded-2xl clay-card-subtle text-xs font-bold text-[#1B254B] dark:text-white hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
+              className="px-3.5 py-2 rounded-lg clay-card-subtle text-xs font-bold text-[#1B254B] dark:text-white hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs"
             >
               <span>Login</span>
             </button>
@@ -193,7 +221,7 @@ export const LandingPage: React.FC = () => {
             {/* Daftar / Register */}
             <button
               onClick={() => navigate("/register")}
-              className="px-4.5 py-2.5 rounded-2xl clay-btn-primary text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="px-4.5 py-2.5 rounded-lg clay-btn-primary text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               <span>Daftar</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -266,7 +294,7 @@ export const LandingPage: React.FC = () => {
           >
             <button
               onClick={() => navigate("/register")}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl clay-btn-primary text-white font-black text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-lg shadow-[#FF6F3D]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="w-full sm:w-auto px-8 py-4 rounded-lg clay-btn-primary text-white font-black text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-lg shadow-[#FF6F3D]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               <Compass className="w-5 h-5 text-white" />
               <span>Kunci Hafalan Anda — 100% Gratis</span>
@@ -275,7 +303,7 @@ export const LandingPage: React.FC = () => {
 
             <button
               onClick={() => handleLaunchApp("quran")}
-              className="w-full sm:w-auto px-6 py-4 rounded-2xl clay-card-subtle text-[#1B254B] dark:text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs whitespace-nowrap"
+              className="w-full sm:w-auto px-6 py-4 rounded-lg clay-card-subtle text-[#1B254B] dark:text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xs whitespace-nowrap"
             >
               <BookOpen className="w-5 h-5 text-[#FF6F3D]" />
               <span>Buka Mushaf 604 Halaman</span>
@@ -580,7 +608,7 @@ export const LandingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleLaunchApp("quran")}
-                className="w-full py-3 rounded-xl clay-btn-primary text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                className="w-full py-3 rounded-lg clay-btn-primary text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
               >
                 <span>Buka Ruang Al-Qur'an</span>
                 <ChevronRight className="w-4 h-4" />
@@ -625,7 +653,7 @@ export const LandingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleLaunchApp("personal")}
-                className="w-full py-3 rounded-xl clay-card-subtle text-[#4E89FF] font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:text-white hover:bg-[#4E89FF] transition-all"
+                className="w-full py-3 rounded-lg clay-card-subtle text-[#4E89FF] font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:text-white hover:bg-[#4E89FF] transition-all"
               >
                 <span>Buka Ruang Kitab</span>
                 <ChevronRight className="w-4 h-4" />
@@ -671,7 +699,7 @@ export const LandingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleLaunchApp("teaching")}
-                className="w-full py-3 rounded-xl clay-card-subtle text-[#10B981] font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:text-white hover:bg-[#10B981] transition-all"
+                className="w-full py-3 rounded-lg clay-card-subtle text-[#10B981] font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:text-white hover:bg-[#10B981] transition-all"
               >
                 <span>Buka Ruang Guru</span>
                 <ChevronRight className="w-4 h-4" />
@@ -743,7 +771,7 @@ export const LandingPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl clay-card-subtle text-center space-y-1.5 border border-emerald-300/50 dark:border-emerald-800/40">
+              <div className="p-5 rounded-lg clay-card-subtle text-center space-y-1.5 border border-emerald-300/50 dark:border-emerald-800/40">
                 <span className="text-[11px] font-bold text-[#10B981] uppercase tracking-wider">
                   Dengan Algoritma Adaptif Unlupa
                 </span>
@@ -856,7 +884,7 @@ export const LandingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate("/register")}
-                className="w-full py-3.5 rounded-2xl clay-card-subtle text-[#1B254B] dark:text-white font-bold text-xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                className="w-full py-3.5 rounded-lg clay-card-subtle text-[#1B254B] dark:text-white font-bold text-xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
               >
                 Gunakan Versi Gratis
               </button>
@@ -930,7 +958,7 @@ export const LandingPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleOpenPro}
-                className="w-full py-4 rounded-2xl clay-btn-primary text-white font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-all"
+                className="w-full py-4 rounded-lg clay-btn-primary text-white font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-all"
               >
                 <Crown className="w-4 h-4 fill-white" />
                 <span>Buka Akses Unlupa Pro Sekarang</span>
@@ -1147,7 +1175,7 @@ export const LandingPage: React.FC = () => {
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
             <button
               onClick={() => navigate("/register")}
-              className="w-full sm:w-auto px-10 py-4.5 rounded-2xl clay-btn-primary text-white font-black text-base flex items-center justify-center gap-3 shadow-xl shadow-[#FF6F3D]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="w-full sm:w-auto px-10 py-4.5 rounded-lg clay-btn-primary text-white font-black text-base flex items-center justify-center gap-3 shadow-xl shadow-[#FF6F3D]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               <Compass className="w-5 h-5 text-white" />
               <span>Buka Unlupa Workspace — Gratis</span>

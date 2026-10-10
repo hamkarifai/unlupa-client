@@ -61,13 +61,13 @@ export const FeatureSection = () => {
         <div className="flex gap-4">
           <button
             onClick={() => scrollSlider(-1)}
-            className="w-12 h-12 rounded-full border border-border bg-surface-1 text-muted-foreground flex items-center justify-center hover:bg-surface-2 hover:text-foreground transition-colors duration-300 cursor-pointer"
+            className="w-12 h-12 rounded-lg border border-border bg-surface-1 text-muted-foreground flex items-center justify-center hover:bg-surface-2 hover:text-foreground transition-colors duration-300 cursor-pointer"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button
             onClick={() => scrollSlider(1)}
-            className="w-12 h-12 rounded-full border border-border bg-surface-1 text-muted-foreground flex items-center justify-center hover:bg-surface-2 hover:text-foreground transition-colors duration-300 cursor-pointer"
+            className="w-12 h-12 rounded-lg border border-border bg-surface-1 text-muted-foreground flex items-center justify-center hover:bg-surface-2 hover:text-foreground transition-colors duration-300 cursor-pointer"
           >
             <ChevronRight className="w-6 h-6" />
           </button>

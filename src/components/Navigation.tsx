@@ -363,10 +363,7 @@ export const Navigation: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setShowProfileMenu(false);
-                              openUpgradeModal(
-                                "Profile Dropdown",
-                                "Buka seluruh modul hafalan, AI Builder, dan kelas tak terbatas.",
-                              );
+                              window.alert("Fitur ini masih dalam tahap pengembangan");
                             }}
                             className="w-full py-1.5 px-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-[11px] flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-95 transition-all"
                           >

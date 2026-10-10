@@ -106,7 +106,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab("quran")}
-            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === "quran"
                 ? "clay-btn-primary text-white shadow-md"
                 : "text-[#707E94] dark:text-slate-300 hover:text-[#1B254B] dark:hover:text-white"
@@ -119,7 +119,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab("books")}
-            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === "books"
                 ? "bg-[#4E89FF] text-white shadow-md"
                 : "text-[#707E94] dark:text-slate-300 hover:text-[#1B254B] dark:hover:text-white"
@@ -132,7 +132,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab("class")}
-            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === "class"
                 ? "bg-[#10B981] text-white shadow-md"
                 : "text-[#707E94] dark:text-slate-300 hover:text-[#1B254B] dark:hover:text-white"
@@ -145,7 +145,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab("review")}
-            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === "review"
                 ? "bg-amber-500 text-white shadow-md"
                 : "text-[#707E94] dark:text-slate-300 hover:text-[#1B254B] dark:hover:text-white"
@@ -424,7 +424,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
                             onClick={() =>
                               setIsQuranPageActive(!isQuranPageActive)
                             }
-                            className={`w-10 h-5.5 rounded-full transition-colors relative p-0.5 cursor-pointer shrink-0 ${
+                            className={`w-10 h-5.5 rounded-md transition-colors relative p-0.5 cursor-pointer shrink-0 ${
                               isQuranPageActive
                                 ? "bg-[#10B981]"
                                 : "bg-slate-300 dark:bg-slate-700"
@@ -437,7 +437,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
                                 stiffness: 500,
                                 damping: 30,
                               }}
-                              className="w-4.5 h-4.5 rounded-full bg-white shadow-xs"
+                              className="w-4.5 h-4.5 rounded-sm bg-white shadow-xs"
                             />
                           </button>
                         </div>
@@ -525,7 +525,7 @@ export const InteractiveAppPhoneMockup: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setIsBookActive(!isBookActive)}
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold cursor-pointer transition-all ${
+                            className={`px-2 py-0.5 rounded-md text-[9px] font-bold cursor-pointer transition-all ${
                               isBookActive
                                 ? "clay-badge-emerald text-white"
                                 : "bg-slate-200 text-slate-600"

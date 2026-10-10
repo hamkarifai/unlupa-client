@@ -2,6 +2,16 @@
 @import "./styles/untitledui.css";
 @import "./styles/theme.css";
 
+/* Override Tailwind's rounded utilities for interactive button controls. */
+@layer utilities {
+  button,
+  [role="button"],
+  [data-slot="button"],
+  [data-rac] button {
+    border-radius: var(--radius-md) !important;
+  }
+}
+
 /* Runtime brand override. Untitled UI declares its default purple palette on
    :root outside Tailwind's theme layer, so these must also be unlayered. */
 :root,
@@ -1036,4 +1046,3 @@ body {
 .perspective-1200 {
   perspective: 1200px;
 }
-

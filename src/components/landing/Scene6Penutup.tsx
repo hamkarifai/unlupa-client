@@ -60,7 +60,7 @@ export const Scene6Penutup: React.FC<Scene6PenutupProps> = ({
               soundEngine.playGlassChime();
               onLaunchApp();
             }}
-            className="group px-9 py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-mono text-xs sm:text-sm font-black tracking-[0.18em] uppercase shadow-[0_0_40px_rgba(245,158,11,0.5)] hover:shadow-[0_0_60px_rgba(245,158,11,0.7)] transition-all flex items-center gap-3 cursor-pointer active:scale-95"
+            className="group px-9 py-4 rounded-lg bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-mono text-xs sm:text-sm font-black tracking-[0.18em] uppercase shadow-[0_0_40px_rgba(245,158,11,0.5)] hover:shadow-[0_0_60px_rgba(245,158,11,0.7)] transition-all flex items-center gap-3 cursor-pointer active:scale-95"
           >
             <Compass className="w-4 h-4 text-slate-950" />
             <span>Masuk ke Unlupa Workspace</span>

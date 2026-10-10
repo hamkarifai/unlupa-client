@@ -69,7 +69,7 @@ export const SolutionSection = () => {
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] group-hover:text-warning transition-colors">
               Pelajari Metodenya
             </span>
-            <div className="w-10 h-10 rounded-full border border-border group-hover:border-warning/50 flex items-center justify-center transition-colors">
+            <div className="w-10 h-10 rounded-lg border border-border group-hover:border-warning/50 flex items-center justify-center transition-colors">
               <div>
                 <a href="#metode">
                   <ArrowDown className="w-5 h-5 animate-bounce group-hover:text-warning" />
