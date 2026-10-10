@@ -1,40 +1,51 @@
-import React, { useState, useMemo } from 'react';
-import { BookOpen, CheckCircle2, AlertCircle, Clock, ArrowRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import React, { useState, useMemo } from "react";
+import {
+  BookOpen,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ArrowRight,
+} from "../foundations/hugeicons";
+import { motion } from "motion/react";
 
 interface MushafLandscapeProps {
   onSelectPage?: (page: number) => void;
 }
 
 // Representative sample pages for rich interactive demonstration
-const SAMPLE_PAGE_DATA: Record<number, { surah: string; juz: number; state: 'mutqin' | 'review_today' | 'stable' }> = {
-  1: { surah: 'Al-Fatihah', juz: 1, state: 'mutqin' },
-  2: { surah: 'Al-Baqarah: 1-5', juz: 1, state: 'mutqin' },
-  3: { surah: 'Al-Baqarah: 6-16', juz: 1, state: 'mutqin' },
-  4: { surah: 'Al-Baqarah: 17-24', juz: 1, state: 'stable' },
-  5: { surah: 'Al-Baqarah: 25-29', juz: 1, state: 'review_today' },
-  6: { surah: 'Al-Baqarah: 30-37', juz: 1, state: 'mutqin' },
-  7: { surah: 'Al-Baqarah: 38-48', juz: 1, state: 'stable' },
-  22: { surah: 'Al-Baqarah: 142-145', juz: 2, state: 'review_today' },
-  50: { surah: 'Ali Imran: 1-9', juz: 3, state: 'mutqin' },
-  77: { surah: 'An-Nisa: 1-6', juz: 4, state: 'stable' },
-  106: { surah: 'Al-Maidah: 1-2', juz: 6, state: 'mutqin' },
-  151: { surah: 'Al-Araf: 1-11', juz: 8, state: 'review_today' },
-  293: { surah: 'Al-Kahf: 1-15', juz: 15, state: 'mutqin' },
-  294: { surah: 'Al-Kahf: 16-27', juz: 15, state: 'mutqin' },
-  304: { surah: 'Al-Kahf: 99-110', juz: 16, state: 'mutqin' },
-  312: { surah: 'Maryam: 1-11', juz: 16, state: 'stable' },
-  322: { surah: 'Thaha: 1-12', juz: 16, state: 'review_today' },
-  440: { surah: 'Yasin: 1-12', juz: 22, state: 'mutqin' },
-  441: { surah: 'Yasin: 13-27', juz: 22, state: 'mutqin' },
-  562: { surah: 'Al-Mulk: 1-12', juz: 29, state: 'mutqin' },
-  563: { surah: 'Al-Mulk: 13-26', juz: 29, state: 'mutqin' },
-  582: { surah: 'An-Naba: 1-30', juz: 30, state: 'mutqin' },
-  583: { surah: 'An-Naba: 31 - An-Naziat: 15', juz: 30, state: 'mutqin' },
-  604: { surah: 'Al-Ikhlas, Al-Falaq, An-Nas', juz: 30, state: 'mutqin' }
+const SAMPLE_PAGE_DATA: Record<
+  number,
+  { surah: string; juz: number; state: "mutqin" | "review_today" | "stable" }
+> = {
+  1: { surah: "Al-Fatihah", juz: 1, state: "mutqin" },
+  2: { surah: "Al-Baqarah: 1-5", juz: 1, state: "mutqin" },
+  3: { surah: "Al-Baqarah: 6-16", juz: 1, state: "mutqin" },
+  4: { surah: "Al-Baqarah: 17-24", juz: 1, state: "stable" },
+  5: { surah: "Al-Baqarah: 25-29", juz: 1, state: "review_today" },
+  6: { surah: "Al-Baqarah: 30-37", juz: 1, state: "mutqin" },
+  7: { surah: "Al-Baqarah: 38-48", juz: 1, state: "stable" },
+  22: { surah: "Al-Baqarah: 142-145", juz: 2, state: "review_today" },
+  50: { surah: "Ali Imran: 1-9", juz: 3, state: "mutqin" },
+  77: { surah: "An-Nisa: 1-6", juz: 4, state: "stable" },
+  106: { surah: "Al-Maidah: 1-2", juz: 6, state: "mutqin" },
+  151: { surah: "Al-Araf: 1-11", juz: 8, state: "review_today" },
+  293: { surah: "Al-Kahf: 1-15", juz: 15, state: "mutqin" },
+  294: { surah: "Al-Kahf: 16-27", juz: 15, state: "mutqin" },
+  304: { surah: "Al-Kahf: 99-110", juz: 16, state: "mutqin" },
+  312: { surah: "Maryam: 1-11", juz: 16, state: "stable" },
+  322: { surah: "Thaha: 1-12", juz: 16, state: "review_today" },
+  440: { surah: "Yasin: 1-12", juz: 22, state: "mutqin" },
+  441: { surah: "Yasin: 13-27", juz: 22, state: "mutqin" },
+  562: { surah: "Al-Mulk: 1-12", juz: 29, state: "mutqin" },
+  563: { surah: "Al-Mulk: 13-26", juz: 29, state: "mutqin" },
+  582: { surah: "An-Naba: 1-30", juz: 30, state: "mutqin" },
+  583: { surah: "An-Naba: 31 - An-Naziat: 15", juz: 30, state: "mutqin" },
+  604: { surah: "Al-Ikhlas, Al-Falaq, An-Nas", juz: 30, state: "mutqin" },
 };
 
-export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPage }) => {
+export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({
+  onSelectPage,
+}) => {
   const [selectedJuz, setSelectedJuz] = useState<number>(30); // Default to Juz 30 (popular)
   const [hoveredPage, setHoveredPage] = useState<number>(582);
 
@@ -53,12 +64,15 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
   const activePageInfo = SAMPLE_PAGE_DATA[hoveredPage] || {
     surah: `Halaman ${hoveredPage}`,
     juz: selectedJuz,
-    state: (hoveredPage % 3 === 0 ? 'review_today' : hoveredPage % 2 === 0 ? 'mutqin' : 'stable') as 'mutqin' | 'review_today' | 'stable'
+    state: (hoveredPage % 3 === 0
+      ? "review_today"
+      : hoveredPage % 2 === 0
+        ? "mutqin"
+        : "stable") as "mutqin" | "review_today" | "stable",
   };
 
   return (
     <div className="w-full rounded-2xl bg-[#121316] border border-[#C4A47C]/20 p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-      
       {/* Decorative Warm Ambient Glow */}
       <div className="absolute top-0 right-1/4 w-80 h-80 bg-[#C4A47C]/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-[#4ADE80]/5 rounded-full blur-3xl pointer-events-none" />
@@ -116,8 +130,8 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all shrink-0 cursor-pointer ${
                 selectedJuz === juz
-                  ? 'bg-[#C4A47C] text-[#0C0D0E] font-bold shadow-[0_0_15px_rgba(196,164,124,0.3)]'
-                  : 'bg-white/5 text-[#8B949E] hover:bg-white/10 hover:text-white border border-white/5'
+                  ? "bg-[#C4A47C] text-[#0C0D0E] font-bold shadow-[0_0_15px_rgba(196,164,124,0.3)]"
+                  : "bg-white/5 text-[#8B949E] hover:bg-white/10 hover:text-white border border-white/5"
               }`}
             >
               Juz {juz}
@@ -133,16 +147,26 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
       <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 py-4">
         {juzPages.map((page) => {
           const sample = SAMPLE_PAGE_DATA[page];
-          const state = sample ? sample.state : (page % 3 === 0 ? 'review_today' : page % 2 === 0 ? 'mutqin' : 'stable');
+          const state = sample
+            ? sample.state
+            : page % 3 === 0
+              ? "review_today"
+              : page % 2 === 0
+                ? "mutqin"
+                : "stable";
           const isSelected = hoveredPage === page;
 
-          let colorClass = 'bg-white/10 border-white/10 text-white/70 hover:border-white/30';
-          if (state === 'mutqin') {
-            colorClass = 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25';
-          } else if (state === 'review_today') {
-            colorClass = 'bg-rose-500/15 border-rose-500/40 text-rose-300 hover:bg-rose-500/25 animate-pulse';
+          let colorClass =
+            "bg-white/10 border-white/10 text-white/70 hover:border-white/30";
+          if (state === "mutqin") {
+            colorClass =
+              "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25";
+          } else if (state === "review_today") {
+            colorClass =
+              "bg-rose-500/15 border-rose-500/40 text-rose-300 hover:bg-rose-500/25 animate-pulse";
           } else {
-            colorClass = 'bg-[#C4A47C]/15 border-[#C4A47C]/40 text-[#E8DCC9] hover:bg-[#C4A47C]/25';
+            colorClass =
+              "bg-[#C4A47C]/15 border-[#C4A47C]/40 text-[#E8DCC9] hover:bg-[#C4A47C]/25";
           }
 
           return (
@@ -154,13 +178,13 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
               }}
               onMouseEnter={() => setHoveredPage(page)}
               className={`aspect-[3/4] rounded-lg border flex flex-col items-center justify-between p-2 transition-all relative group cursor-pointer ${colorClass} ${
-                isSelected ? 'ring-2 ring-white scale-105 shadow-xl z-10' : ''
+                isSelected ? "ring-2 ring-white scale-105 shadow-xl z-10" : ""
               }`}
             >
               <span className="text-[9px] font-mono text-white/50">{page}</span>
               <div className="w-1.5 h-1.5 rounded-full bg-current" />
               <span className="text-[8px] font-serif opacity-75 truncate max-w-full">
-                {page % 2 === 0 ? 'Kiri' : 'Kanan'}
+                {page % 2 === 0 ? "Kiri" : "Kanan"}
               </span>
             </button>
           );
@@ -168,7 +192,7 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
       </div>
 
       {/* Live Selected Page Telemetry Card */}
-      <motion.div 
+      <motion.div
         key={hoveredPage}
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
@@ -178,7 +202,9 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[#C4A47C]/10 border border-[#C4A47C]/30 flex flex-col items-center justify-center text-[#C4A47C]">
             <span className="text-[9px] font-mono leading-none">HAL</span>
-            <span className="text-lg font-bold font-serif leading-tight">{hoveredPage}</span>
+            <span className="text-lg font-bold font-serif leading-tight">
+              {hoveredPage}
+            </span>
           </div>
 
           <div>
@@ -191,11 +217,11 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
               </span>
             </div>
             <p className="text-xs text-[#8B949E] mt-0.5">
-              {activePageInfo.state === 'mutqin' 
-                ? 'Status: Mutqin Kokoh — Interval berikutnya dalam 24 hari' 
-                : activePageInfo.state === 'review_today'
-                ? 'Status: Perlu Disiram Hari Ini — Kurva ingatan mendekati ambang lupa'
-                : 'Status: Stabil — Terjadwal murajaah 3 hari lagi'}
+              {activePageInfo.state === "mutqin"
+                ? "Status: Mutqin Kokoh — Interval berikutnya dalam 24 hari"
+                : activePageInfo.state === "review_today"
+                  ? "Status: Perlu Disiram Hari Ini — Kurva ingatan mendekati ambang lupa"
+                  : "Status: Stabil — Terjadwal murajaah 3 hari lagi"}
             </p>
           </div>
         </div>
@@ -208,7 +234,6 @@ export const MushafLandscape604: React.FC<MushafLandscapeProps> = ({ onSelectPag
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </motion.div>
-
     </div>
   );
 };

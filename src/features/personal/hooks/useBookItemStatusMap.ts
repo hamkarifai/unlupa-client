@@ -3,7 +3,17 @@ import { personalService } from "../services/personal.services";
 import type { RawItemEntity } from "../types/personal.types";
 
 // Maps content_ref → { status, item_id }
-export type ItemStatusEntry = { status: string; item_id: string };
+export type ItemStatusEntry = {
+  status: string;
+  item_id: string;
+  owner_id: string;
+  content_ref: string;
+  stability: number;
+  difficulty: number;
+  review_count: number;
+  last_review_at: string | null;
+  next_review_at: string | null;
+};
 export type ItemStatusMap = Map<string, ItemStatusEntry>;
 
 // content_ref format: book:{bookId}:item:{bookItemId}
@@ -42,6 +52,15 @@ export const useBookItemStatusMap = () => {
             map.set(item.ContentRef, {
               status: normalizeStatus(item.Status),
               item_id: item.ID,
+              owner_id: item.OwnerID,
+              content_ref: item.ContentRef,
+              stability: item.Stability,
+              difficulty: item.Difficulty,
+              review_count: item.ReviewCount,
+              last_review_at: item.LastReviewAt,
+              next_review_at: item.Status === "interval"
+                ? item.IntervalNextReviewAt ?? null
+                : item.NextReviewAt,
             });
           });
         }

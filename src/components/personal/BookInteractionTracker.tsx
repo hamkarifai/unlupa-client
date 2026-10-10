@@ -201,9 +201,9 @@ export const BookInteractionTracker: React.FC<BookInteractionTrackerProps> = ({
   }, [itemRecords, searchQuery, filterMode]);
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-secondary bg-primary shadow-xs">
+    <section className="overflow-hidden rounded-2xl border border-secondary bg-primary shadow-xs sm:rounded-3xl">
       {/* Top Header Card */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800">
+      <div className="border-b border-slate-100 p-5 dark:border-slate-800">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-200 ring-inset">
@@ -341,7 +341,7 @@ export const BookInteractionTracker: React.FC<BookInteractionTrackerProps> = ({
 
       {/* Expanded Rincian Data Section */}
       {isExpanded && (
-        <div className="p-4 sm:p-5 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
+        <div className="space-y-4 bg-slate-50/50 p-5 dark:bg-slate-900/50">
           {/* Controls Bar: Search & Cohesive Filter Tabs */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search Input */}

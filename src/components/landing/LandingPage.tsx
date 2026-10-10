@@ -16,19 +16,19 @@ import {
   Check,
   Crown,
   Star,
-  ChevronDown
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router';
-import { InteractiveAppPhoneMockup } from './InteractiveAppPhoneMockup';
-import { HomeHeroProgressRings } from '../home/HomeHeroProgressRings';
-import { WorkloadForecastWaveWidget } from '../home/WorkloadForecastWaveWidget';
-import { VisualReviewCalendar } from '../home/VisualReviewCalendar';
-import { WeeklyStreakWidget } from '../home/WeeklyStreakWidget';
-import { MemoryStabilityPyramidWidget } from '../home/MemoryStabilityPyramidWidget';
-import { AccuracyRetentionDialWidget } from '../home/AccuracyRetentionDialWidget';
-import { ConsistencyJourneyWidget } from '../home/ConsistencyJourneyWidget';
-import type { AppSpace } from '../../types';
+  ChevronDown,
+} from "../foundations/hugeicons";
+import { motion, AnimatePresence } from "motion/react";
+import { useNavigate } from "react-router";
+import { InteractiveAppPhoneMockup } from "./InteractiveAppPhoneMockup";
+import { HomeHeroProgressRings } from "../home/HomeHeroProgressRings";
+import { WorkloadForecastWaveWidget } from "../home/WorkloadForecastWaveWidget";
+import { VisualReviewCalendar } from "../home/VisualReviewCalendar";
+import { WeeklyStreakWidget } from "../home/WeeklyStreakWidget";
+import { MemoryStabilityPyramidWidget } from "../home/MemoryStabilityPyramidWidget";
+import { AccuracyRetentionDialWidget } from "../home/AccuracyRetentionDialWidget";
+import { ConsistencyJourneyWidget } from "../home/ConsistencyJourneyWidget";
+import type { AppSpace } from "../../types";
 
 export const LandingPage: React.FC = () => {
   const {
@@ -48,10 +48,10 @@ export const LandingPage: React.FC = () => {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   // Handlers
-  const handleLaunchApp = (targetSpace: AppSpace = 'dashboard') => {
+  const handleLaunchApp = (targetSpace: AppSpace = "dashboard") => {
     setIsLandingPageOpen(false);
     setActiveSpace(targetSpace);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleOpenPro = () => {
@@ -157,15 +157,27 @@ export const LandingPage: React.FC = () => {
           <div className="flex items-center gap-2 shrink-0">
             {/* Masuk dengan Gmail */}
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate("/login")}
               className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 hover:scale-105 active:scale-95 transition-all shadow-2xs cursor-pointer"
               title="Masuk dengan Akun Google / Gmail"
             >
               <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.19v3.15C3.17 21.3 7.22 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.19C.43 8.1 0 9.8 0 12s.43 3.9 1.19 5.42l4.09-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.17 2.7 1.19 6.58l4.09 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.19v3.15C3.17 21.3 7.22 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.19C.43 8.1 0 9.8 0 12s.43 3.9 1.19 5.42l4.09-3.15z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.17 2.7 1.19 6.58l4.09 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                />
               </svg>
               <span>Masuk Gmail</span>
             </button>

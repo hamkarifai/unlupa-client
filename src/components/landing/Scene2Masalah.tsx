@@ -1,5 +1,10 @@
-import React from 'react';
-import { AlertCircle, TrendingDown, Clock, Brain } from 'lucide-react';
+import React from "react";
+import {
+  AlertCircle,
+  TrendingDown,
+  Clock,
+  Brain,
+} from "../foundations/hugeicons";
 
 interface Scene2MasalahProps {
   opacity: number;
@@ -9,12 +14,11 @@ export const Scene2Masalah: React.FC<Scene2MasalahProps> = ({ opacity }) => {
   if (opacity <= 0.01) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 flex flex-col justify-center items-end px-6 sm:px-16 pointer-events-none transition-opacity duration-300 z-10"
       style={{ opacity }}
     >
       <div className="max-w-xl text-right space-y-6">
-        
         {/* Telemetry Tag */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/50 border border-rose-500/40 backdrop-blur-md shadow-[0_0_20px_rgba(244,63,94,0.2)]">
           <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
@@ -33,11 +37,15 @@ export const Scene2Masalah: React.FC<Scene2MasalahProps> = ({ opacity }) => {
 
         {/* Sacred Quote in Amiri Font */}
         <div className="p-5 rounded-2xl bg-slate-900/80 border border-amber-500/20 backdrop-blur-md space-y-2 shadow-xl">
-          <p className="text-2xl sm:text-3xl font-serif text-amber-300 leading-loose dir-rtl" style={{ fontFamily: "'Amiri', serif" }}>
+          <p
+            className="text-2xl sm:text-3xl font-serif text-amber-300 leading-loose dir-rtl"
+            style={{ fontFamily: "'Amiri', serif" }}
+          >
             سَنُقْرِئُكَ فَلَا تَنسَىٰ
           </p>
           <p className="text-xs text-slate-300 italic">
-            "Kami akan membacakan kepadamu (Al-Qur'an), maka kamu tidak akan lupa."
+            "Kami akan membacakan kepadamu (Al-Qur'an), maka kamu tidak akan
+            lupa."
           </p>
           <span className="text-[10px] font-mono text-amber-400/80 uppercase tracking-widest block">
             QS. Al-A'la : 6
@@ -46,8 +54,11 @@ export const Scene2Masalah: React.FC<Scene2MasalahProps> = ({ opacity }) => {
 
         {/* Cognitive & Practical Explanation */}
         <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
-          Secara alamiah, otak manusia membuang <strong>70% informasi dalam 48 jam pertama</strong> jika tidak disentuh kembali. 
-          Bukan karena kita lemah, tetapi karena kita tidak memiliki <em>sistem interval cerdas</em> yang memberitahu kapan waktu terbaik untuk mengulang.
+          Secara alamiah, otak manusia membuang{" "}
+          <strong>70% informasi dalam 48 jam pertama</strong> jika tidak
+          disentuh kembali. Bukan karena kita lemah, tetapi karena kita tidak
+          memiliki <em>sistem interval cerdas</em> yang memberitahu kapan waktu
+          terbaik untuk mengulang.
         </p>
 
         {/* Telemetry Comparison Box */}
@@ -58,9 +69,13 @@ export const Scene2Masalah: React.FC<Scene2MasalahProps> = ({ opacity }) => {
             </span>
             <div className="flex items-center gap-2 mt-1">
               <TrendingDown className="w-4 h-4 text-rose-400" />
-              <span className="text-xl font-mono font-black text-rose-400">-72%</span>
+              <span className="text-xl font-mono font-black text-rose-400">
+                -72%
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Hilang tanpa jadwal presisi</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">
+              Hilang tanpa jadwal presisi
+            </span>
           </div>
 
           <div className="p-3.5 rounded-xl bg-slate-950/70 border border-amber-500/40">
@@ -69,12 +84,15 @@ export const Scene2Masalah: React.FC<Scene2MasalahProps> = ({ opacity }) => {
             </span>
             <div className="flex items-center gap-2 mt-1">
               <Brain className="w-4 h-4 text-amber-400" />
-              <span className="text-xl font-mono font-black text-amber-300">98.4%</span>
+              <span className="text-xl font-mono font-black text-amber-300">
+                98.4%
+              </span>
             </div>
-            <span className="text-[10px] text-amber-200/80 block mt-0.5">Mutqin jangka panjang</span>
+            <span className="text-[10px] text-amber-200/80 block mt-0.5">
+              Mutqin jangka panjang
+            </span>
           </div>
         </div>
-
       </div>
     </div>
   );

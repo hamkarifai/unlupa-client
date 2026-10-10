@@ -128,6 +128,7 @@ interface AppContextType {
   // Data
   quranPages: QuranPageItem[];
   books: Book[];
+  setBooks: React.Dispatch<React.SetStateAction<Book[]>>;
   chapters: Chapter[];
   items: BookItem[];
   myClasses: ClassGroup[];
@@ -161,7 +162,7 @@ interface AppContextType {
   
   activateItem: (itemId: string) => void;
   deactivateItem: (itemId: string) => void;
-  reviewItem: (itemId: string, rating: 1 | 2 | 3 | 4) => void;
+  reviewItem: (itemId: string, rating: 1 | 2 | 3 | 4) => Promise<number>;
   
   createBook: (data: { title: string; description: string; coverUrl?: string; isPublic?: boolean; category?: string }) => Promise<Book> | Book;
   updateBook: (id: string, data: Partial<Book>) => Promise<void> | void;
@@ -199,6 +200,7 @@ interface AppContextType {
 
   fetchClasses: () => Promise<void>;
   fetchClassMembers: (classId: string) => Promise<void>;
+  fetchClassBooks: (classId: string) => Promise<void>;
   joinClassByCode: (code: string) => Promise<{ success: boolean; message: string }>;
   leaveClass: (classId: string) => void;
   createTeachingClass: (data: { 
@@ -209,7 +211,7 @@ interface AppContextType {
     code?: string;
     requiredJuzList?: number[];
     assignedBookIds?: string[];
-  }) => ClassGroup;
+  }) => Promise<ClassGroup>;
   deleteTeachingClass: (classId: string) => void;
   closeTeachingClass: (classId: string) => void;
   reopenTeachingClass: (classId: string) => void;
@@ -293,8 +295,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.THEME, theme);
-      document.documentElement.classList.toggle('dark-mode', theme === 'dark');
-      document.documentElement.classList.remove('dark');
+      const isDark = theme === 'dark';
+      document.documentElement.classList.toggle('dark-mode', isDark);
+      document.documentElement.classList.toggle('dark', isDark);
       document.documentElement.style.colorScheme = theme;
     } catch (e) {
       console.error('Error setting theme class', e);
@@ -1119,6 +1122,222 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
+  // Load hierarchical Book Tree (Book -> Module -> Submodule / Card)
+  const loadBookTree = useCallback(async (bookId: string) => {
+    if (!bookId) return;
+    const realBookId = bookId.startsWith('class-book-') ? bookId.split('-').slice(3).join('-') : bookId;
+    try {
+      const res = await personalService.getBookTree(realBookId);
+      if (res && res.data) {
+        const tree = res.data;
+        // Book tree supplies canonical content, not the signed-in user's
+        // activation state. Hydrate active phases by the per-user content_ref.
+        const stateResults = await Promise.allSettled(
+          ["menghafal", "interval", "fsrs_active", "graduate", "inactive", "start"]
+            .map(status => personalService.getItemsByStatus(status)),
+        );
+        const itemStateByContentRef = new Map<string, any>();
+        stateResults.forEach(result => {
+          if (result.status !== "fulfilled" || !Array.isArray(result.value?.data)) return;
+          result.value.data.forEach((stateItem: any) => {
+            const contentRef = stateItem.ContentRef || stateItem.content_ref;
+            if (!contentRef) return;
+            itemStateByContentRef.set(contentRef, stateItem);
+          });
+        });
+        const getStudentItemState = (item: any) => itemStateByContentRef.get(
+          `book:${realBookId}:item:${item.id}`,
+        );
+        const flattenedChapters: Chapter[] = [];
+        const flattenedItems: BookItem[] = [];
+
+        const currentBookId = bookId;
+        const masterBookId = tree.book_id || (tree as any).id || realBookId;
+        const processModule = (mod: any, parentId: string | null) => {
+          flattenedChapters.push({
+            id: mod.id,
+            bookId: currentBookId,
+            title: mod.name || mod.title || 'Modul',
+            description: mod.description || '',
+            parentId: parentId,
+            order: mod.order || 0,
+            masterChapterId: null,
+          });
+
+          if (Array.isArray(mod.items)) {
+            mod.items.forEach((item: any) => {
+              const studentState = getStudentItemState(item);
+              const rawStatus = studentState?.Status || studentState?.status || item.status;
+              const persistedStatus = rawStatus === 'ujian' ? 'fsrs_active' : rawStatus;
+              const isAct = persistedStatus === 'fsrs_active' || persistedStatus === 'interval' || item.is_active || false;
+              const status: BookItem['status'] = isAct ? 'active' : persistedStatus === 'graduate' ? 'mastered' : 'inactive';
+              const qText = item.question || item.content || item.title || '';
+              flattenedItems.push({
+                id: item.id,
+                bookId: currentBookId,
+                chapterId: mod.id,
+                question: qText,
+                answer: item.answer || '',
+                imageQ: item.image || item.image_url || undefined,
+                imageA: undefined,
+                tags: item.tags || [],
+                isActive: isAct,
+                status,
+                masterItemId: item.id,
+                masterBookId: masterBookId,
+                fsrsData: {
+                  stability: studentState?.Stability ?? item.stability ?? 0,
+                  difficulty: studentState?.Difficulty ?? item.difficulty ?? 5.0,
+                  reps: studentState?.ReviewCount ?? item.reps ?? item.review_count ?? 0,
+                  lapses: item.lapses || 0,
+                  lastReview: studentState
+                    ? studentState.LastReviewAt ?? null
+                    : item.last_review_at ?? null,
+                  nextReview: studentState
+                    ? (persistedStatus === 'interval'
+                      ? studentState.IntervalNextReviewAt
+                      : studentState.NextReviewAt) ?? null
+                    : item.next_review_at ?? null,
+                  state: (persistedStatus === 'fsrs_active' ? 'review' : 'new') as any,
+                },
+                createdAt: item.created_at || new Date().toISOString(),
+              });
+            });
+          }
+
+          if (Array.isArray(mod.children)) {
+            mod.children.forEach((child: any) => {
+              processModule(child, mod.id);
+            });
+          }
+        };
+
+        if (Array.isArray(tree.modules)) {
+          tree.modules.forEach((mod: any) => {
+            processModule(mod, null);
+          });
+        }
+
+        if (Array.isArray(tree.items)) {
+          tree.items.forEach((item: any) => {
+            const studentState = getStudentItemState(item);
+            const rawStatus = studentState?.Status || studentState?.status || item.status;
+            const persistedStatus = rawStatus === 'ujian' ? 'fsrs_active' : rawStatus;
+            const isAct = persistedStatus === 'fsrs_active' || persistedStatus === 'interval' || item.is_active || false;
+            const status: BookItem['status'] = isAct ? 'active' : persistedStatus === 'graduate' ? 'mastered' : 'inactive';
+            const qText = item.question || item.content || item.title || '';
+            flattenedItems.push({
+              id: item.id,
+              bookId: currentBookId,
+              chapterId: null,
+              question: qText,
+              answer: item.answer || '',
+              imageQ: item.image || item.image_url || undefined,
+              imageA: undefined,
+              tags: item.tags || [],
+              isActive: isAct,
+              status,
+              masterItemId: item.id,
+              masterBookId: masterBookId,
+              fsrsData: {
+                stability: studentState?.Stability ?? item.stability ?? 0,
+                difficulty: studentState?.Difficulty ?? item.difficulty ?? 5.0,
+                reps: studentState?.ReviewCount ?? item.reps ?? item.review_count ?? 0,
+                lapses: item.lapses || 0,
+                lastReview: studentState
+                  ? studentState.LastReviewAt ?? null
+                  : item.last_review_at ?? null,
+                nextReview: studentState
+                  ? (persistedStatus === 'interval'
+                    ? studentState.IntervalNextReviewAt
+                    : studentState.NextReviewAt) ?? null
+                  : item.next_review_at ?? null,
+                state: (persistedStatus === 'fsrs_active' ? 'review' : 'new') as any,
+              },
+              createdAt: item.created_at || new Date().toISOString(),
+            });
+          });
+        }
+
+        setChapters(prev => {
+          const withoutCurrent = prev.filter(c => c.bookId !== currentBookId && c.bookId !== realBookId);
+          return [...withoutCurrent, ...flattenedChapters];
+        });
+
+        setItems(prev => {
+          const withoutCurrent = prev.filter(i => i.bookId !== currentBookId && i.bookId !== realBookId);
+          return [...withoutCurrent, ...flattenedItems];
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load book tree:", e);
+    }
+  }, []);
+
+  const fetchClassBooks = useCallback(async (classId: string) => {
+    if (!classId) return;
+    try {
+      const classBooks = await classroomService.getClassBook(classId);
+      if (Array.isArray(classBooks) && classBooks.length > 0) {
+        const bookIds = classBooks.map(cb => cb.book_id || cb.book?.id).filter(Boolean);
+        
+        const updateClassBooks = (classes: ClassGroup[]) => classes.map(cls => cls.id === classId ? {
+          ...cls,
+          assignedBookIds: bookIds.length > 0 ? bookIds : cls.assignedBookIds,
+        } : cls);
+        setTeachingClasses(updateClassBooks);
+        setMyClasses(updateClassBooks);
+
+        const newBooksToInject: Book[] = [];
+        classBooks.forEach(cb => {
+          const b = cb.book;
+          const bId = cb.book_id || b?.id;
+          if (bId) {
+            newBooksToInject.push({
+              id: bId,
+              userId: b?.owner_id || '',
+              title: b?.title || 'Kitab',
+              description: b?.description || '',
+              coverUrl: b?.cover_image || undefined,
+              category: 'class',
+              classId: classId,
+              isReadonly: b?.owner_id ? b.owner_id !== userProfile.id : false,
+              isPublic: false,
+              authorName: (cb as any).owner_name || 'Pengajar',
+              createdAt: b?.created_at || new Date().toISOString(),
+              updatedAt: b?.updated_at || new Date().toISOString(),
+            });
+            void loadBookTree(bId);
+          }
+        });
+
+        if (newBooksToInject.length > 0) {
+          setBooks(prev => {
+            const injectMap = new Map(newBooksToInject.map(nb => [nb.id, nb]));
+            const updated = prev.map(b => {
+              const found = injectMap.get(b.id);
+              if (found) {
+                return {
+                  ...b,
+                  ...found,
+                  category: 'class' as const,
+                  classId: found.classId || b.classId || classId,
+                  isReadonly: b.userId ? b.userId !== userProfile.id : found.isReadonly,
+                };
+              }
+              return b;
+            });
+            const existingIds = new Set(prev.map(b => b.id));
+            const toAdd = newBooksToInject.filter(b => !existingIds.has(b.id));
+            return [...updated, ...toAdd];
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch books for class ${classId}:`, err);
+    }
+  }, [loadBookTree, userProfile.id]);
+
   const fetchClasses = useCallback(async () => {
     const token = useAuthStore.getState().token;
     if (!token) return;
@@ -1147,6 +1366,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             status: c.is_active ? 'active' : 'closed',
           }));
           setTeachingClasses(mapped);
+
+          // Fetch books for non-quran classes
+          mapped.filter(c => c.type !== 'quran').forEach(c => {
+            void fetchClassBooks(c.id);
+          });
         }
       }
 
@@ -1169,11 +1393,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: c.is_active ? 'active' : 'closed',
         }));
         setMyClasses(mappedJoined);
+
+        // Fetch books for non-quran joined classes
+        mappedJoined.filter(c => c.type !== 'quran').forEach(c => {
+          void fetchClassBooks(c.id);
+        });
       }
     } catch (err) {
       console.warn("Failed to fetch classes from backend API:", err);
     }
-  }, [userProfile.role, userProfile.id, userProfile.fullName]);
+  }, [userProfile.role, userProfile.id, userProfile.fullName, fetchClassBooks]);
 
   const fetchClassMembers = useCallback(async (classId: string) => {
     if (!classId) return;
@@ -1270,106 +1499,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [authUser, token, fetchUserBooks, fetchQuranProgress, fetchPublishedLibrary, fetchClasses]);
 
-  // Load hierarchical Book Tree (Book -> Module -> Submodule / Card)
-  const loadBookTree = useCallback(async (bookId: string) => {
-    if (!bookId) return;
-    try {
-      const res = await personalService.getBookTree(bookId);
-      if (res && res.data) {
-        const tree = res.data;
-        const flattenedChapters: Chapter[] = [];
-        const flattenedItems: BookItem[] = [];
 
-        const currentBookId = tree.book_id || (tree as any).id || bookId;
-        const processModule = (mod: any, parentId: string | null) => {
-          flattenedChapters.push({
-            id: mod.id,
-            bookId: currentBookId,
-            title: mod.name || mod.title || 'Modul',
-            description: mod.description || '',
-            parentId: parentId,
-            order: mod.order || 0,
-            masterChapterId: null,
-          });
-
-          if (Array.isArray(mod.items)) {
-            mod.items.forEach((item: any) => {
-              const isAct = item.status === 'fsrs_active' || item.status === 'interval' || item.is_active || false;
-              const qText = item.question || item.content || item.title || '';
-              flattenedItems.push({
-                id: item.id,
-                bookId: currentBookId,
-                chapterId: mod.id,
-                question: qText,
-                answer: item.answer || '',
-                imageQ: item.image || item.image_url || undefined,
-                imageA: undefined,
-                tags: item.tags || [],
-                isActive: isAct,
-                status: item.status || 'inactive',
-                fsrsData: {
-                  stability: item.stability || 0,
-                  difficulty: item.difficulty || 5.0,
-                  reps: item.reps || item.review_count || 0,
-                  lapses: item.lapses || 0,
-                  lastReview: item.last_review_at || null,
-                  nextReview: item.next_review_at || null,
-                  state: (item.status === 'fsrs_active' ? 'review' : 'new') as any,
-                },
-                createdAt: item.created_at || new Date().toISOString(),
-              });
-            });
-          }
-
-          if (Array.isArray(mod.children)) {
-            mod.children.forEach((child: any) => {
-              processModule(child, mod.id);
-            });
-          }
-        };
-
-        if (Array.isArray(tree.modules)) {
-          tree.modules.forEach((mod: any) => {
-            processModule(mod, null);
-          });
-        }
-
-        if (Array.isArray(tree.items)) {
-          tree.items.forEach((item: any) => {
-            const isAct = item.status === 'fsrs_active' || item.status === 'interval' || item.is_active || false;
-            const qText = item.question || item.content || item.title || '';
-            flattenedItems.push({
-              id: item.id,
-              bookId: currentBookId,
-              chapterId: undefined,
-              question: qText,
-              answer: item.answer || '',
-              imageQ: item.image || item.image_url || undefined,
-              imageA: undefined,
-              tags: item.tags || [],
-              isActive: isAct,
-              status: item.status || 'inactive',
-              fsrsData: {
-                stability: item.stability || 0,
-                difficulty: item.difficulty || 5.0,
-                reps: item.reps || item.review_count || 0,
-                lapses: item.lapses || 0,
-                lastReview: item.last_review_at || null,
-                nextReview: item.next_review_at || null,
-                state: (item.status === 'fsrs_active' ? 'review' : 'new') as any,
-              },
-              createdAt: item.created_at || new Date().toISOString(),
-            });
-          });
-        }
-
-        setChapters(prev => [...prev.filter(c => c.bookId !== bookId), ...flattenedChapters]);
-        setItems(prev => [...prev.filter(i => i.bookId !== bookId), ...flattenedItems]);
-      }
-    } catch (err) {
-      console.warn(`Failed to fetch tree for book ${bookId}:`, err);
-    }
-  }, []);
 
   useEffect(() => {
     void fetchUserBooks();
@@ -1457,8 +1587,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Sync items progress to all enrolled non-quran classes
       if (myClasses.length > 0 && userProfile.id !== 'guest') {
         myClasses.filter(c => c.type === 'non-quran').forEach(cls => {
-          const studentClassBookIds = cls.assignedBookIds?.map(masterId => `class-book-${cls.id}-${masterId}`) || [];
-          const classItems = items.filter(i => studentClassBookIds.includes(i.bookId));
+          const targetBookIds = new Set<string>();
+          (cls.assignedBookIds || []).forEach(id => {
+            targetBookIds.add(id);
+            targetBookIds.add(`class-book-${cls.id}-${id}`);
+            if (id.startsWith(`class-book-${cls.id}-`)) {
+              targetBookIds.add(id.replace(`class-book-${cls.id}-`, ''));
+            }
+          });
+          const classItems = items.filter(i => targetBookIds.has(i.bookId));
           const activeItems = classItems.filter(i => i.isActive);
           const dueItems = classItems.filter(i => isDue(i.fsrsData.nextReview, i.isActive));
           const avgStability = activeItems.length > 0 
@@ -1942,8 +2079,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Non-Quran Item Actions
   const activateItem = (itemId: string) => {
+    let targetBookId: string | undefined;
+    let actualItemId = itemId;
+    let actualBookId: string | undefined;
+
     setItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
+      const match = item.id === itemId || (item as any).masterItemId === itemId || item.id === `class-item-${itemId}`;
+      if (!match) return item;
+      targetBookId = item.bookId;
+      actualItemId = (item as any).masterItemId || (item.id.startsWith('class-item-') ? item.id.split('-').slice(4).join('-') : item.id);
       return {
         ...item,
         isActive: true,
@@ -1955,39 +2099,172 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       };
     }));
+
+    if (!targetBookId) {
+      const foundItem = items.find(i => i.id === itemId || (i as any).masterItemId === itemId);
+      if (foundItem) {
+        targetBookId = foundItem.bookId;
+        actualItemId = (foundItem as any).masterItemId || (foundItem.id.startsWith('class-item-') ? foundItem.id.split('-').slice(4).join('-') : foundItem.id);
+      }
+    }
+
+    if (targetBookId) {
+      if (targetBookId.startsWith('class-book-')) {
+        const bookObj = books.find(b => b.id === targetBookId);
+        actualBookId = (bookObj as any)?.masterBookId || targetBookId.split('-').slice(3).join('-');
+      } else {
+        actualBookId = targetBookId;
+      }
+      const bookIdToUse = actualBookId || targetBookId;
+      if (bookIdToUse) {
+        personalService.startItemPhase(bookIdToUse, actualItemId).then(res => {
+          const realStateItemId = (res as any)?.data?.item_id || (res as any)?.data?.id;
+          if (realStateItemId) {
+            personalService.activateFsrsPhase(bookIdToUse, realStateItemId).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    }
   };
 
-  const deactivateItem = (itemId: string) => {
+  const deactivateItem = async (itemId: string) => {
+    let actualItemId = itemId;
+    let targetBookId: string | undefined;
     setItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
+      const match = item.id === itemId || (item as any).masterItemId === itemId || item.id === `class-item-${itemId}`;
+      if (!match) return item;
+      targetBookId = item.bookId;
+      actualItemId = (item as any).masterItemId || (item.id.startsWith('class-item-') ? item.id.split('-').slice(4).join('-') : item.id);
       return {
         ...item,
         isActive: false,
-        // Preserve item.status and full fsrsData history
+        status: 'inactive',
       };
     }));
+
+    if (!targetBookId) {
+      const foundItem = items.find(i => i.id === itemId || (i as any).masterItemId === itemId);
+      if (foundItem) {
+        targetBookId = foundItem.bookId;
+        actualItemId = (foundItem as any).masterItemId || (foundItem.id.startsWith('class-item-') ? foundItem.id.split('-').slice(4).join('-') : foundItem.id);
+      }
+    }
+
+    if (targetBookId) {
+      const realBookId = targetBookId.startsWith('class-book-') ? targetBookId.split('-').slice(3).join('-') : targetBookId;
+      try {
+        const statuses = ["menghafal", "interval", "fsrs_active", "ujian", "start"];
+        const results = await Promise.allSettled(statuses.map(s => personalService.getItemsByStatus(s)));
+        let realStateItemId = actualItemId;
+        const targetRef = `book:${realBookId}:item:${actualItemId}`;
+        for (const res of results) {
+          if (res.status === 'fulfilled' && Array.isArray(res.value?.data)) {
+            const match = res.value.data.find((raw: any) => raw.ContentRef === targetRef || raw.content_ref === targetRef);
+            if (match) {
+              realStateItemId = (match as any).ID || (match as any).id || actualItemId;
+              break;
+            }
+          }
+        }
+        await personalService.deactivateItem(realStateItemId);
+      } catch {
+        personalService.deactivateItem(actualItemId).catch(() => {});
+      }
+    } else {
+      personalService.deactivateItem(actualItemId).catch(() => {});
+    }
   };
 
-  const reviewItem = (itemId: string, rating: 1 | 2 | 3 | 4) => {
+  const reviewItem = async (itemId: string, rating: 1 | 2 | 3 | 4): Promise<number> => {
+    const bookItem = items.find(item => item.id === itemId || (item as any).masterItemId === itemId);
+    if (!bookItem) throw new Error('Item buku tidak ditemukan. Muat ulang halaman lalu coba lagi.');
+
+    const sourceBookId = (bookItem as any).masterBookId || bookItem.bookId;
+    const sourceBookItemId = (bookItem as any).masterItemId || bookItem.id;
+    const realBookId = sourceBookId.startsWith('class-book-')
+      ? sourceBookId.split('-').slice(3).join('-')
+      : sourceBookId;
+    const contentRef = `book:${realBookId}:item:${sourceBookItemId}`;
+    const currentUserId = useAuthStore.getState().user?.id || userProfile.id;
+
+    if (!currentUserId || currentUserId === 'guest') {
+      throw new Error('Login diperlukan untuk menyimpan review buku.');
+    }
+
+    // Resolve the user's state row by its canonical book content reference.
+    // Never send the canonical book_item ID to the review endpoint.
+    const stateResponses = await Promise.all(
+      ['menghafal', 'interval', 'fsrs_active', 'graduate', 'inactive', 'start']
+        .map(status => personalService.getItemsByStatus(status)),
+    );
+    const studentItem = stateResponses
+      .flatMap(response => response.data || [])
+      .find(raw => raw.ContentRef === contentRef);
+
+    if (!studentItem || studentItem.OwnerID !== currentUserId || studentItem.SourceType !== 'book') {
+      throw new Error('State review milik Anda untuk item buku ini tidak ditemukan.');
+    }
+
+    const persistedStatus = studentItem.Status === 'ujian' ? 'fsrs_active' : studentItem.Status;
+    let nextReviewAt: string | null;
+    let intervalDays: number;
+    let updatedStatus: string;
+    let stability = studentItem.Stability;
+    let difficulty = studentItem.Difficulty;
+    let reviewCount: number;
+    let lastReviewAt: string | null;
+
+    if (persistedStatus === 'interval') {
+      const response = await personalService.reviewIntervalBook(studentItem.ID, {
+        rating: Math.min(rating, 3) as 1 | 2 | 3,
+      });
+      nextReviewAt = response.data.interval_next_review_at;
+      intervalDays = response.data.interval_days;
+      updatedStatus = response.data.status;
+      reviewCount = response.data.review_count;
+      lastReviewAt = studentItem.LastReviewAt;
+    } else {
+      const response = await personalService.reviewFsrsBook(studentItem.ID, { rating });
+      nextReviewAt = response.data.next_review_at;
+      intervalDays = response.data.next_interval_days;
+      updatedStatus = response.data.status;
+      stability = response.data.stability;
+      difficulty = response.data.difficulty;
+      reviewCount = response.data.review_count;
+      lastReviewAt = response.data.last_review_at;
+    }
+
+    const normalizedStatus = updatedStatus === 'ujian' ? 'fsrs_active' : updatedStatus;
+    const newLog = {
+      id: Math.random().toString(36).substring(7),
+      date: lastReviewAt || new Date().toISOString(),
+      rating,
+      wasDue: !bookItem.fsrsData?.nextReview || new Date(bookItem.fsrsData.nextReview) <= new Date(),
+    };
+
+    // Update UI only after the backend has accepted and persisted the review.
     setItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const isDueBeforeReview = !item.fsrsData?.nextReview || new Date(item.fsrsData.nextReview) <= today;
-      const { newState, nextIntervalDays } = updateNonQuranFSRS(item.fsrsData, rating);
-      const newLog = {
-        id: Math.random().toString(36).substring(7),
-        date: new Date().toISOString(),
-        rating,
-        wasDue: isDueBeforeReview,
-      };
+      const matchesSourceItem = item.id === sourceBookItemId || (item as any).masterItemId === sourceBookItemId;
+      const matchesBook = item.bookId === bookItem.bookId;
+      if (!matchesSourceItem || !matchesBook) return item;
       return {
         ...item,
-        status: nextIntervalDays >= 375 ? 'mastered' : (item.isActive ? 'active' : 'inactive'),
-        fsrsData: newState,
+        isActive: normalizedStatus !== 'inactive',
+        status: normalizedStatus === 'graduate' ? 'mastered' : (normalizedStatus === 'inactive' ? 'inactive' : 'active'),
+        fsrsData: {
+          ...item.fsrsData,
+          stability,
+          difficulty,
+          reps: reviewCount,
+          lastReview: lastReviewAt,
+          nextReview: nextReviewAt,
+          state: normalizedStatus === 'graduate' ? 'mastered' : 'review',
+        },
         reviewLogs: [...(item.reviewLogs || []), newLog],
       };
     }));
+
+    return intervalDays;
   };
 
   // Book & Chapter Operations
@@ -2553,9 +2830,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let studentClassRecord = { ...targetClass };
 
     if (targetClass.type === 'non-quran') {
-      const assignedIds = targetClass.assignedBookIds && targetClass.assignedBookIds.length > 0 
-        ? targetClass.assignedBookIds 
-        : ['book-1'];
+      let assignedIds = targetClass.assignedBookIds && targetClass.assignedBookIds.length > 0
+        ? targetClass.assignedBookIds
+        : [];
+
+      if (assignedIds.length === 0) {
+        try {
+          const classBooks = await classroomService.getClassBook(targetClass.id);
+          if (Array.isArray(classBooks) && classBooks.length > 0) {
+            assignedIds = classBooks.map(cb => cb.book_id || cb.book?.id).filter(Boolean);
+            targetClass.assignedBookIds = assignedIds;
+
+            classBooks.forEach(cb => {
+              const b = cb.book;
+              const bId = cb.book_id || b?.id;
+              if (bId) {
+                const newBookObj: Book = {
+                  id: bId,
+                  userId: b?.owner_id || targetClass!.teacherId || '',
+                  title: b?.title || targetClass!.name,
+                  description: b?.description || '',
+                  coverUrl: b?.cover_image || targetClass!.coverUrl,
+                  category: 'class',
+                  isReadonly: true,
+                  isPublic: false,
+                  authorName: (cb as any).owner_name || targetClass!.teacherName || 'Pengajar',
+                  createdAt: b?.created_at || new Date().toISOString(),
+                  updatedAt: b?.updated_at || new Date().toISOString(),
+                };
+                setBooks(prev => {
+                  if (prev.some(eb => eb.id === bId)) return prev;
+                  return [newBookObj, ...prev];
+                });
+                void loadBookTree(bId);
+              }
+            });
+          }
+        } catch (e) {
+          console.warn("Failed to fetch class books on join:", e);
+        }
+      }
 
       const studentClassBookIds: string[] = [];
       const newClassBooks: Book[] = [];
@@ -2702,7 +3016,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const createTeachingClass = (data: { 
+  const createTeachingClass = async (data: { 
     name: string; 
     type: 'quran' | 'non-quran'; 
     description?: string; 
@@ -2710,44 +3024,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     code?: string;
     requiredJuzList?: number[];
     assignedBookIds?: string[];
-  }): ClassGroup => {
-    const rawCode = data.code?.trim().toUpperCase();
-    const finalCode = rawCode || `${data.type === 'quran' ? 'QRN' : 'BOOK'}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const tempId = `cls-${Date.now()}`;
-    const newClass: ClassGroup = {
-      id: tempId,
-      teacherId: userProfile.id,
-      teacherName: userProfile.fullName,
-      name: data.name,
-      code: finalCode,
-      type: data.type,
-      description: data.description || '',
-      coverUrl: data.coverUrl,
-      requiredJuzList: data.type === 'quran' ? (data.requiredJuzList || [1, 2, 3, 4, 5]) : undefined,
-      assignedBookIds: data.type === 'non-quran' ? (data.assignedBookIds || [books[0]?.id].filter(Boolean)) : undefined,
-      students: [],
-      createdAt: new Date().toISOString(),
-    };
-    
-    // Optimistic local update
-    setTeachingClasses(prev => [newClass, ...prev]);
+  }): Promise<ClassGroup> => {
+    let finalCode = data.code?.trim().toUpperCase() || `${data.type === 'quran' ? 'QRN' : 'BOOK'}-${Math.floor(1000 + Math.random() * 9000)}`;
+    let finalId = `cls-${Date.now()}`;
+    let finalCoverUrl = data.coverUrl;
 
     // Backend API sync
     const token = useAuthStore.getState().token;
     if (token) {
-      classroomService.createClass({
-        name: data.name,
-        description: data.description || '',
-        type: data.type === 'quran' ? 'quran' : 'book',
-        cover_image: data.coverUrl,
-      }).then(async (createdServerClass) => {
+      try {
+        const createdServerClass = await classroomService.createClass({
+          name: data.name,
+          description: data.description || '',
+          type: data.type === 'quran' ? 'quran' : 'book',
+          cover_image: data.coverUrl,
+        });
+
         if (createdServerClass && createdServerClass.id) {
-          setTeachingClasses(prev => prev.map(c => c.id === tempId ? {
-            ...c,
-            id: createdServerClass.id,
-            code: createdServerClass.class_code || c.code,
-            coverUrl: createdServerClass.cover_image || c.coverUrl,
-          } : c));
+          finalId = createdServerClass.id;
+          if (createdServerClass.class_code) {
+            finalCode = createdServerClass.class_code;
+          }
+          if (createdServerClass.cover_image) {
+            finalCoverUrl = createdServerClass.cover_image;
+          }
 
           if (data.type === 'non-quran' && data.assignedBookIds && data.assignedBookIds.length > 0) {
             for (let i = 0; i < data.assignedBookIds.length; i++) {
@@ -2762,10 +3062,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         }
-      }).catch(err => {
+      } catch (err) {
         console.warn("Failed to create class on backend API:", err);
-      });
+      }
     }
+
+    const newClass: ClassGroup = {
+      id: finalId,
+      teacherId: userProfile.id,
+      teacherName: userProfile.fullName,
+      name: data.name,
+      code: finalCode,
+      type: data.type,
+      description: data.description || '',
+      coverUrl: finalCoverUrl,
+      requiredJuzList: data.type === 'quran' ? (data.requiredJuzList || [1, 2, 3, 4, 5]) : undefined,
+      assignedBookIds: data.type === 'non-quran' ? (data.assignedBookIds || [books[0]?.id].filter(Boolean)) : undefined,
+      students: [],
+      createdAt: new Date().toISOString(),
+    };
+    
+    // Save to state
+    setTeachingClasses(prev => [newClass, ...prev.filter(c => c.id !== newClass.id)]);
 
     // Sync class globally so other users can discover it by code
     syncClassToGlobal(newClass);
@@ -3273,7 +3591,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const reviewStudentBookItem = (classId: string, studentId: string, itemId: string, rating: 1 | 2 | 3 | 4, note?: string) => {
     if (studentId === `std-user-${userProfile.id}`) {
-      reviewItem(itemId, rating);
+      void reviewItem(itemId, rating).catch(error => {
+        console.warn('Student book review failed:', error);
+      });
     }
 
     const ratingLabels: Record<number, string> = { 1: 'Perlu Belajar Ulang (Again)', 2: 'Masih Sulit (Hard)', 3: 'Sudah Paham (Good)', 4: 'Sangat Menguasai (Easy)' };
@@ -3387,20 +3707,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const bookStats = useMemo(() => {
     const safeBooks = Array.isArray(books) ? books : [];
     const safeItems = Array.isArray(items) ? items : [];
-    const active = safeItems.filter(i => i && i.isActive);
+    const safeMyClasses = Array.isArray(myClasses) ? myClasses : [];
+    const safeTeachingClasses = Array.isArray(teachingClasses) ? teachingClasses : [];
+
+    const classBookIds = new Set<string>();
+    [...safeMyClasses, ...safeTeachingClasses].forEach(c => {
+      if (c && Array.isArray(c.assignedBookIds)) {
+        c.assignedBookIds.forEach(id => classBookIds.add(id));
+      }
+    });
+
+    const personalBooks = safeBooks.filter(b => {
+      if (!b) return false;
+      if (b.category === 'class') return false;
+      if (b.classId) return false;
+      if (b.id.startsWith('class-book-')) return false;
+      if (classBookIds.has(b.id)) return false;
+      return true;
+    });
+    const personalBookIdSet = new Set(personalBooks.map(b => b.id));
+
+    const personalItems = safeItems.filter(i => i && personalBookIdSet.has(i.bookId));
+    const active = personalItems.filter(i => i && i.isActive);
     const dueList = active.filter(i => i && isDue(i.fsrsData?.nextReview, i.isActive));
     const totalStability = active.reduce((sum, item) => sum + (item.fsrsData?.stability || 0), 0);
     const avgStability = active.length > 0 ? Math.round(totalStability / active.length) : 0;
     
     return {
-      totalBooks: safeBooks.length,
-      totalItems: safeItems.length,
+      totalBooks: personalBooks.length,
+      totalItems: personalItems.length,
       activeItems: active.length,
       dueToday: dueList.length,
       avgStability,
       dueList
     };
-  }, [books, items]);
+  }, [books, items, myClasses, teachingClasses]);
 
   const myClassesStats = useMemo(() => {
     let dueToday = 0;
@@ -3511,14 +3852,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateQuranMapanSchedule, setGlobalMapanSchedule,
       addQuranPageFeedback, addQuranPageIssue, resolveQuranPageIssue,
       
-      books, chapters, items, personalStats: bookStats, myClassesStats,
+      books, setBooks, chapters, items, personalStats: bookStats, myClassesStats,
       currentStreak, totalActiveMaterials, totalMasteredMaterials,
       activateItem, deactivateItem, reviewItem,
       createBook, updateBook, deleteBook, duplicateBookAsEditable,
       createChapter, updateChapter, deleteChapter,
       createItem, updateItem, deleteItem, reorderItems,
       loadBookTree, fetchUserBooks, fetchPublishedLibrary,
-      fetchClasses, fetchClassMembers,
+      fetchClasses, fetchClassMembers, fetchClassBooks,
       importFromLibrary, importFromJSON, exportBookJSON, publishBookToLibrary, library,
       
       transactions, purchasedBookIds, isBookPurchased, purchaseBook, subscribeToPro,

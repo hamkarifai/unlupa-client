@@ -13,8 +13,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           : "light"
         : theme;
 
-    root.classList.toggle("dark-mode", resolved === "dark");
-    root.classList.remove("dark");
+    const isDark = resolved === "dark";
+    root.classList.toggle("dark-mode", isDark);
+    root.classList.toggle("dark", isDark);
     root.style.colorScheme = resolved;
   }, [theme]);
 
@@ -26,8 +27,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const handler = () => {
       const root = document.documentElement;
       const resolved = mq.matches ? "dark" : "light";
-      root.classList.toggle("dark-mode", resolved === "dark");
-      root.classList.remove("dark");
+      const isDark = resolved === "dark";
+      root.classList.toggle("dark-mode", isDark);
+      root.classList.toggle("dark", isDark);
       root.style.colorScheme = resolved;
     };
 

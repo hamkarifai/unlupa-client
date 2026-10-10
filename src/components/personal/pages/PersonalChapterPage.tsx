@@ -280,7 +280,7 @@ export const PersonalChapterPage = ({
         </div>
       </div>
 
-      <section className="relative overflow-hidden rounded-3xl border border-brand-200 bg-[linear-gradient(145deg,var(--color-bg-primary)_0%,var(--color-bg-primary)_60%,var(--color-brand-50)_100%)] p-4 shadow-lg sm:p-6">
+      <section className="relative overflow-hidden rounded-2xl border border-brand-200 bg-[linear-gradient(145deg,var(--color-bg-primary)_0%,var(--color-bg-primary)_60%,var(--color-brand-50)_100%)] p-5 shadow-lg sm:rounded-3xl sm:p-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
@@ -383,7 +383,7 @@ export const PersonalChapterPage = ({
           ].map(({ label, value, color, icon: Icon }) => (
             <div
               key={label}
-              className="rounded-2xl border border-secondary bg-primary p-3.5 shadow-xs"
+              className="rounded-xl border border-secondary bg-primary p-4 shadow-xs sm:rounded-2xl"
             >
               <div
                 className={`flex size-8 items-center justify-center rounded-lg ring-1 ring-inset ${color}`}
@@ -400,7 +400,7 @@ export const PersonalChapterPage = ({
       </section>
 
       {isBulkMode && (
-        <section className="flex flex-col gap-3 rounded-2xl bg-gray-950 p-3.5 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 rounded-xl bg-gray-950 p-4 text-white shadow-lg sm:rounded-2xl sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={onToggleSelectAll}
@@ -477,7 +477,7 @@ export const PersonalChapterPage = ({
         </section>
       )}
 
-      <section className="rounded-3xl border border-secondary bg-primary p-4 shadow-xs sm:p-5">
+      <section className="rounded-2xl border border-secondary bg-primary p-4 shadow-xs sm:rounded-3xl sm:p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-secondary p-1">
             {filters.map(({ id, label, count, icon: Icon }) => (

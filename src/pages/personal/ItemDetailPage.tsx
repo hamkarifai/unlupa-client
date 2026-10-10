@@ -241,46 +241,81 @@ export const ItemDetailPage = () => {
       console.error(
         "[handleIntervalSubmit] Terjadi kesalahan saat mengirim interval",
       );
+      toast.error("Gagal mengirim interval.");
     }
   };
 
   const handleActivateFsrsPhase = async () => {
     if (!bookId || !itemId) return;
-    const itemIdToUse = realItemId;
+    let itemIdToUse = realItemId;
+    if (!itemIdToUse && bookId) {
+      try {
+        const map = await fetchStatusMap();
+        const entry = map.get(contentRefForItem(bookId, itemId));
+        itemIdToUse = entry?.item_id ?? null;
+      } catch {
+        itemIdToUse = null;
+      }
+    }
     if (!itemIdToUse) {
-      console.error("[handleActivateFsrsPhase] No real item_id available");
-      return;
+      itemIdToUse = itemId;
     }
     try {
-      await activateFsrs(bookId, itemIdToUse);
+      const res = await activateFsrs(bookId, itemIdToUse);
+      const newRealId = (res as any)?.data?.id || (res as any)?.data?.item_id || (res as any)?.id;
+      if (newRealId) {
+        setRealItemId(newRealId);
+      }
       pendingStatusRef.current = "fsrs_active";
       apiStatusRef.current = "fsrs_active";
       setItem((prev) => (prev ? { ...prev, status: "fsrs_active" } : null));
       setIsActivateFsrsModalOpen(false);
+      toast.success("Ujian interval (FSRS) berhasil diaktifkan.");
     } catch (err: unknown) {
       console.error(
         "[handleActivateFsrsPhase] Terjadi kesalahan saat mengaktifkan FSRS",
       );
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Terjadi kesalahan saat mengaktifkan FSRS.";
+      toast.error(msg);
     }
   };
 
   const handleDeactivate = async () => {
     if (!itemId) return;
-    const itemIdToUse = realItemId;
+    let itemIdToUse = realItemId;
+    if (!itemIdToUse && bookId) {
+      try {
+        const map = await fetchStatusMap();
+        const entry = map.get(contentRefForItem(bookId, itemId));
+        itemIdToUse = entry?.item_id ?? null;
+      } catch {
+        itemIdToUse = null;
+      }
+    }
     if (!itemIdToUse) {
-      console.error("[handleDeactivate] No real item_id available");
-      return;
+      itemIdToUse = itemId;
     }
     try {
-      await personalService.deactivateItem(itemIdToUse);
+      const res = await personalService.deactivateItem(itemIdToUse);
+      const newRealId = (res as any)?.data?.id || (res as any)?.data?.item_id || (res as any)?.id;
+      if (newRealId) {
+        setRealItemId(newRealId);
+      }
       pendingStatusRef.current = "inactive";
       apiStatusRef.current = "inactive";
       setItem((prev) => (prev ? { ...prev, status: "inactive" } : null));
       setIsDeactivateModalOpen(false);
+      toast.success("Item berhasil diluluskan/dinonaktifkan.");
     } catch (err: unknown) {
       console.error(
         "[handleDeactivate] Terjadi kesalahan saat menonaktifkan item",
       );
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Terjadi kesalahan saat menonaktifkan item.";
+      toast.error(msg);
     }
   };
 
@@ -299,14 +334,15 @@ export const ItemDetailPage = () => {
     }
 
     if (!itemIdToUse) {
-      toast.error(
-        "Data item tidak ditemukan. Silakan muat ulang halaman lalu coba lagi.",
-      );
-      return;
+      itemIdToUse = itemId;
     }
 
     try {
-      await personalService.reactivateItem(itemIdToUse);
+      const res = await personalService.reactivateItem(itemIdToUse);
+      const newRealId = (res as any)?.data?.id || (res as any)?.data?.item_id || (res as any)?.id;
+      if (newRealId) {
+        setRealItemId(newRealId);
+      }
       pendingStatusRef.current = "fsrs_active";
       apiStatusRef.current = "fsrs_active";
       setItem((prev) => (prev ? { ...prev, status: "fsrs_active" } : null));

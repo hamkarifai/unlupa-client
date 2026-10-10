@@ -149,33 +149,13 @@ export const DashboardLayout: React.FC = () => {
               }
               className="group flex cursor-pointer items-center gap-2.5 rounded-xl text-left outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-4"
             >
-              <div className="relative flex size-9 items-center justify-center overflow-hidden rounded-xl border border-brand-500 bg-[linear-gradient(145deg,#fb923c_0%,#ef6905_58%,#c2410c_100%)] shadow-lg shadow-brand-500/25 transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-105">
-                <div className="absolute -right-2 -top-2 size-5 rounded-full bg-white/25 blur-sm" />
-                {/* Custom CSS Logo */}
-                <div className="w-4 h-5 relative flex flex-col justify-between">
-                  <div
-                    className="absolute left-0 top-1 bottom-0 w-2 rounded-sm bg-gradient-to-b from-white via-orange-50 to-orange-200"
-                    style={{
-                      clipPath: "polygon(0 15%, 100% 0, 100% 100%, 0 85%)",
-                    }}
-                  />
-                  <div
-                    className="absolute right-0 top-0 bottom-1 w-2 rounded-sm bg-gradient-to-b from-white via-orange-50 to-orange-200"
-                    style={{
-                      clipPath: "polygon(0 0, 100% 15%, 100% 85%, 0 100%)",
-                    }}
-                  />
-                  <div
-                    className="absolute bottom-0 left-1 right-1 h-2 bg-gradient-to-r from-orange-200 to-white"
-                    style={{
-                      clipPath: "polygon(0 100%, 100% 0, 100% 100%, 0 100%)",
-                    }}
-                  />
-                  <div
-                    className="absolute top-0 left-1 right-1 h-2 bg-gradient-to-r from-white to-orange-100"
-                    style={{ clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 0)" }}
-                  />
-                </div>
+              <div className="relative flex size-9 items-center justify-center overflow-hidden rounded-lg border border-brand-200 bg-white shadow-md shadow-brand-500/15 transition-transform duration-200 group-hover:-rotate-3 group-hover:scale-105 dark:bg-slate-950">
+                <img
+                  src="/unlupa.logo.png"
+                  alt="Logo Unlupa"
+                  className="size-full scale-[1.45] object-contain"
+                  draggable={false}
+                />
               </div>
               <div>
                 <span

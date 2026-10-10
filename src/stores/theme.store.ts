@@ -20,9 +20,10 @@ function getSystemTheme(): "light" | "dark" {
 function applyTheme(theme: Theme) {
   const resolved = theme === "system" ? getSystemTheme() : theme;
   const root = document.documentElement;
+  const isDark = resolved === "dark";
   
-  root.classList.toggle("dark-mode", resolved === "dark");
-  root.classList.remove("dark");
+  root.classList.toggle("dark-mode", isDark);
+  root.classList.toggle("dark", isDark);
   root.style.colorScheme = resolved;
   
   return resolved;

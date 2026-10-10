@@ -669,7 +669,7 @@ export const BookReviewCalendarModal: React.FC<Props> = ({
             </div>
           )}
 
-          <div className="space-y-2 rounded-3xl border border-secondary bg-primary p-3 shadow-xs sm:p-4">
+          <div className="space-y-2 rounded-2xl border border-secondary bg-primary p-4 shadow-xs sm:rounded-3xl sm:p-5">
             {/* Day Header */}
             <div className="grid grid-cols-7 gap-1 text-center">
               {weekDayLabels.map((lbl, idx) => (
@@ -787,7 +787,7 @@ export const BookReviewCalendarModal: React.FC<Props> = ({
             </div>
 
           {/* DETAIL DRAWER FOR SELECTED DATE */}
-          <aside className="space-y-4 rounded-3xl border border-brand-200 bg-[linear-gradient(145deg,var(--color-bg-primary)_0%,var(--color-brand-50)_100%)] p-4 shadow-xs lg:sticky lg:top-0">
+          <aside className="space-y-4 rounded-2xl border border-brand-200 bg-[linear-gradient(145deg,var(--color-bg-primary)_0%,var(--color-brand-50)_100%)] p-5 shadow-xs sm:rounded-3xl lg:sticky lg:top-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">

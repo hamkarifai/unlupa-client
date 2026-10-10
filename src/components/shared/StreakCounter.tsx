@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame } from 'lucide-react';
+import { Flame } from '@/components/foundations/hugeicons';
 import { motion } from 'motion/react';
 
 export interface StreakCounterProps {

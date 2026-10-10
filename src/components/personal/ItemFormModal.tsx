@@ -264,7 +264,7 @@ export const ItemFormModal = ({
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <section className="rounded-3xl border border-secondary bg-primary p-4 shadow-xs">
+                  <section className="rounded-2xl border border-secondary bg-primary p-5 shadow-xs sm:rounded-3xl">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-xs font-bold text-brand-700 ring-1 ring-brand-200 ring-inset">Q</span>
                       <div>
@@ -284,7 +284,7 @@ export const ItemFormModal = ({
                     {!hasQuestion && <p className="mt-2 text-xs text-tertiary">{language === "en" ? "Question text or an image is required." : "Teks pertanyaan atau gambar wajib diisi."}</p>}
                   </section>
 
-                  <section className="rounded-3xl border border-secondary bg-primary p-4 shadow-xs">
+                  <section className="rounded-2xl border border-secondary bg-primary p-5 shadow-xs sm:rounded-3xl">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="flex size-7 items-center justify-center rounded-lg bg-utility-green-50 text-xs font-bold text-utility-green-700 ring-1 ring-utility-green-200 ring-inset">A</span>
                       <div>

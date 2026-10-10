@@ -1,25 +1,37 @@
-import React from 'react';
-import { useScrambleText } from './useScrambleText';
-import { ArrowRight, ChevronDown, Compass, BookOpen, Layers, ShieldCheck, Zap, RotateCcw, CheckCircle2 } from 'lucide-react';
-import { soundEngine } from './audio';
+import React from "react";
+import { useScrambleText } from "./useScrambleText";
+import {
+  ArrowRight,
+  ChevronDown,
+  Compass,
+  BookOpen,
+  Layers,
+  ShieldCheck,
+  Zap,
+  RotateCcw,
+  CheckCircle2,
+} from "../foundations/hugeicons";
+import { soundEngine } from "./audio";
 
 interface Scene1HeroProps {
   opacity: number;
   onLaunchApp: () => void;
 }
 
-export const Scene1Hero: React.FC<Scene1HeroProps> = ({ opacity, onLaunchApp }) => {
-  const scrambledTitle = useScrambleText('UNLUPA', true, 1100);
+export const Scene1Hero: React.FC<Scene1HeroProps> = ({
+  opacity,
+  onLaunchApp,
+}) => {
+  const scrambledTitle = useScrambleText("UNLUPA", true, 1100);
 
   if (opacity <= 0.01) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 flex flex-col justify-center items-center text-center px-4 sm:px-6 pointer-events-none transition-opacity duration-300 z-10"
       style={{ opacity }}
     >
       <div className="max-w-4xl mx-auto flex flex-col items-center space-y-6 sm:space-y-8">
-        
         {/* Amber Gold Brand Telemetry Badge */}
         <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 backdrop-blur-xl shadow-[0_0_25px_rgba(245,158,11,0.2)]">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_10px_#f59e0b]" />
@@ -33,9 +45,9 @@ export const Scene1Hero: React.FC<Scene1HeroProps> = ({ opacity, onLaunchApp }) 
           <div className="text-xs sm:text-sm font-mono tracking-[0.3em] text-slate-400 uppercase font-semibold">
             DULU KITA BERJUANG DARI TIDAK TAHU
           </div>
-          
+
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-sans font-black tracking-tight text-white uppercase select-none leading-[1.08] drop-shadow-[0_4px_30px_rgba(0,0,0,0.8)]">
-            SEKARANG, JANGAN SAMPAI{' '}
+            SEKARANG, JANGAN SAMPAI{" "}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 drop-shadow-[0_0_35px_rgba(245,158,11,0.4)]">
               LUPA.
             </span>
@@ -48,8 +60,12 @@ export const Scene1Hero: React.FC<Scene1HeroProps> = ({ opacity, onLaunchApp }) 
             "Sistem Pengunci Ingatan & Penjaga Hafalan Abadi."
           </p>
           <p className="text-xs sm:text-sm md:text-base text-slate-300 max-w-xl mx-auto font-light leading-relaxed">
-            Menghafal Al-Qur'an dan menuntut ilmu butuh waktu bertahun-tahun. Tanpa jadwal pengulangan presisi, 70% ilmu pudar dalam 48 jam. 
-            <span className="text-amber-300 font-normal"> Unlupa mengunci hafalan tepat sebelum Anda melupakannya.</span>
+            Menghafal Al-Qur'an dan menuntut ilmu butuh waktu bertahun-tahun.
+            Tanpa jadwal pengulangan presisi, 70% ilmu pudar dalam 48 jam.
+            <span className="text-amber-300 font-normal">
+              {" "}
+              Unlupa mengunci hafalan tepat sebelum Anda melupakannya.
+            </span>
           </p>
         </div>
 
@@ -76,13 +92,15 @@ export const Scene1Hero: React.FC<Scene1HeroProps> = ({ opacity, onLaunchApp }) 
         {/* Brand Highlights & Feature Badges */}
         <div className="flex flex-wrap justify-center items-center gap-2 pt-1 text-[11px] text-slate-400 pointer-events-auto">
           <span className="px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 flex items-center gap-1.5 shadow-sm">
-            <BookOpen className="w-3.5 h-3.5 text-amber-400" /> 604 Halaman Mushaf
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" /> 604 Halaman
+            Mushaf
           </span>
           <span className="px-3.5 py-1.5 rounded-full bg-slate-800/60 border border-slate-700/60 text-slate-300 flex items-center gap-1.5 shadow-sm">
             <Layers className="w-3.5 h-3.5 text-blue-400" /> Kitab Matn Klasik
           </span>
           <span className="px-3.5 py-1.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-center gap-1.5 shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 98.4% Mutqin Target
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 98.4%
+            Mutqin Target
           </span>
         </div>
 
@@ -93,7 +111,6 @@ export const Scene1Hero: React.FC<Scene1HeroProps> = ({ opacity, onLaunchApp }) 
           </span>
           <ChevronDown className="w-4 h-4 text-amber-400 animate-bounce" />
         </div>
-
       </div>
     </div>
   );

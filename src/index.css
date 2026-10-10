@@ -23,7 +23,7 @@
 @plugin "tailwindcss-animate";
 @plugin "tailwindcss-react-aria-components";
 
-@custom-variant dark (&:where(.dark-mode, .dark-mode *));
+@custom-variant dark (&:where(.dark-mode, .dark-mode *, .dark, .dark *));
 @custom-variant label (& [data-label]);
 @custom-variant focus-input-within (&:has(input:focus));
 

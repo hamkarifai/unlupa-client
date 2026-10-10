@@ -76,19 +76,6 @@ const REVIEW_BUTTONS = [
     hoverBg: "hover:bg-success/5",
     dot: "bg-success/60",
   },
-  {
-    id: 4 as const,
-    payloadValue: 3 as const,
-    header: "Sempurna",
-    icon: Flame,
-    descriptions: ["Reflek", "Tanpa Salah", "Sangat Lancar", "Sempurna"],
-    accent: "text-info",
-    accentBg: "bg-info/10",
-    accentBorder: "border-info/20",
-    hoverBorder: "hover:border-info/40",
-    hoverBg: "hover:bg-info/5",
-    dot: "bg-info/60",
-  },
 ] as const;
 
 export const BookDailyReviewFlashcardModal = ({
@@ -100,7 +87,7 @@ export const BookDailyReviewFlashcardModal = ({
   onReviewed,
 }: BookDailyReviewFlashcardModalProps) => {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [submittingButtonId, setSubmittingButtonId] = useState<1 | 2 | 3 | 4 | null>(null);
+  const [submittingButtonId, setSubmittingButtonId] = useState<1 | 2 | 3 | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [itemContent, setItemContent] = useState<string>("");
   const [itemAnswer, setItemAnswer] = useState<string>("");
@@ -342,7 +329,7 @@ export const BookDailyReviewFlashcardModal = ({
                 <p className="text-muted-foreground text-sm">Pilih satu — nilai langsung tersimpan.</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6 md:grid-cols-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                 {REVIEW_BUTTONS.map((btn) => {
                   const isSubmitting = submittingButtonId === btn.id;
                   return (
@@ -355,7 +342,7 @@ export const BookDailyReviewFlashcardModal = ({
                     >
                       <div className="flex items-center gap-2 p-3 border-b border-border">
                         <span className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 group-active:scale-110 transition-transform ${btn.accentBg}`}>
-                          <btn.icon className={`w-3.5 h-3.5 ${btn.accent}${btn.id === 4 ? " animate-pulse" : ""}`} />
+                          <btn.icon className={`w-3.5 h-3.5 ${btn.accent}`} />
                         </span>
                         <span className={`text-xs font-semibold ${btn.accent}`}>{btn.header}</span>
                         <span className={`ml-auto shrink-0 w-1.5 h-1.5 rounded-full ${btn.dot}`} />

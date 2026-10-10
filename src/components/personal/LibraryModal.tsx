@@ -435,7 +435,7 @@ export const LibraryModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   return (
                     <div
                       key={entry.id}
-                      className="group flex min-h-64 flex-col justify-between rounded-3xl border border-secondary bg-primary p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg"
+                      className="group flex min-h-64 flex-col justify-between rounded-2xl border border-secondary bg-primary p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg sm:rounded-3xl"
                     >
                       <div>
                         {/* Cover & Header Info */}

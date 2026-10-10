@@ -20,6 +20,7 @@ import { AudioRecorderPlayer } from "../shared/AudioRecorderPlayer";
 import { useSwipeGesture } from "../../hooks/useSwipeGesture";
 import { soundEffects } from "../../lib/soundFeedback";
 import { BilingualCardText } from "../common/BilingualCardText";
+import { toast } from "sonner";
 
 interface Props {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const PersonalReviewModal = ({ isOpen, onClose, specificBookId, specificC
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [sessionQueue] = useState<BookItem[]>(() =>
     specificChapterId
       ? personalStats.dueList.filter((item) => item.chapterId === specificChapterId)
@@ -47,20 +49,20 @@ export const PersonalReviewModal = ({ isOpen, onClose, specificBookId, specificC
   const currentChapter = currentItem ? chapters.find((chapter) => chapter.id === currentItem.chapterId) : null;
   const isFinished = !currentItem || currentIndex >= sessionQueue.length;
 
-  const handleRating = (rating: 1 | 2 | 3 | 4) => {
-    if (!currentItem || justRated) return;
-    soundEffects.playRatingFeedback(rating);
-    const intervals = predictNonQuranIntervals(currentItem.fsrsData);
+  const handleRating = async (rating: 1 | 2 | 3) => {
+    if (!currentItem || justRated || isSubmittingReview) return;
     const labels = {
       1: language === "en" ? "Review again" : "Perlu diulang",
       2: language === "en" ? "Hard" : "Sulit",
       3: language === "en" ? "Good" : "Baik",
-      4: language === "en" ? "Easy" : "Mudah",
     };
 
-    setJustRated({ rating, label: labels[rating], interval: intervals[rating] });
-    window.setTimeout(() => {
-      reviewItem(currentItem.id, rating);
+    setIsSubmittingReview(true);
+    try {
+      const nextIntervalDays = await reviewItem(currentItem.id, rating);
+      soundEffects.playRatingFeedback(rating);
+      setJustRated({ rating, label: labels[rating], interval: `${nextIntervalDays}d` });
+      window.setTimeout(() => {
       setReviewedCount((count) => count + 1);
       setShowAnswer(false);
       setJustRated(null);
@@ -71,7 +73,13 @@ export const PersonalReviewModal = ({ isOpen, onClose, specificBookId, specificC
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
         setCurrentIndex(sessionQueue.length);
       }
-    }, 280);
+      }, 280);
+    } catch (error) {
+      console.error("Book review failed:", error);
+      toast.error("Review gagal disimpan. Coba lagi.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   useSwipeGesture(null, {
@@ -100,7 +108,6 @@ export const PersonalReviewModal = ({ isOpen, onClose, specificBookId, specificC
         { rating: 1 as const, label: language === "en" ? "Again" : "Lagi", interval: predictedIntervals[1], className: "border-error/30 bg-error-primary text-error-primary hover:bg-error-secondary" },
         { rating: 2 as const, label: language === "en" ? "Hard" : "Sulit", interval: predictedIntervals[2], className: "border-utility-yellow-200 bg-utility-yellow-50 text-utility-yellow-700 hover:bg-utility-yellow-100" },
         { rating: 3 as const, label: language === "en" ? "Good" : "Baik", interval: predictedIntervals[3], className: "border-utility-green-200 bg-utility-green-50 text-utility-green-700 hover:bg-utility-green-100" },
-        { rating: 4 as const, label: language === "en" ? "Easy" : "Mudah", interval: predictedIntervals[4], className: "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100" },
       ]
     : [];
 
@@ -183,9 +190,9 @@ export const PersonalReviewModal = ({ isOpen, onClose, specificBookId, specificC
                         {justRated && (
                           <div className="flex items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-2 text-white shadow-md"><CheckCircle2 className="size-4 text-utility-green-400" /><span className="text-xs font-semibold">{justRated.label}</span><span className="text-[11px] text-gray-300">({justRated.interval})</span></div>
                         )}
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <div className="grid grid-cols-3 gap-2">
                           {ratings.map((option) => (
-                            <button key={option.rating} type="button" disabled={Boolean(justRated)} onClick={() => handleRating(option.rating)} className={`flex min-h-16 flex-col items-center justify-center rounded-2xl border px-2 py-2.5 text-center shadow-xs transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 ${option.className} ${justRated?.rating === option.rating ? "ring-2 ring-current ring-offset-2" : ""}`}>
+                            <button key={option.rating} type="button" disabled={Boolean(justRated) || isSubmittingReview} onClick={() => void handleRating(option.rating)} className={`flex min-h-16 flex-col items-center justify-center rounded-2xl border px-2 py-2.5 text-center shadow-xs transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 ${option.className} ${justRated?.rating === option.rating ? "ring-2 ring-current ring-offset-2" : ""}`}>
                               <span className="text-sm font-semibold">{option.label}</span><span className="mt-0.5 text-xs opacity-75">{option.interval}</span>
                             </button>
                           ))}

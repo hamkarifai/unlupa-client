@@ -5,6 +5,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { MaintenancePage } from './pages/maintanance/Maintenance';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { Navigation } from './components/Navigation';
 import { QuranSpace } from './components/quran/QuranSpace';
@@ -201,6 +202,13 @@ const MainContent: React.FC = () => {
 };
 
 export default function App() {
+  const isMaintenance =
+    import.meta.env.VITE_MAINTENANCE === 'true';
+
+  if (isMaintenance) {
+    return <MaintenancePage />;
+  }
+
   return (
     <AppErrorBoundary>
       <AppProvider>

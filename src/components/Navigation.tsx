@@ -203,38 +203,13 @@ export const Navigation: React.FC = () => {
                 onClick={() => setIsLandingPageOpen(false)}
                 className="flex items-center gap-2.5 text-left group cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-[#121315] border border-[#2A2B2E] flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-105 transition-transform overflow-hidden relative">
-                  {/* Custom CSS Logo */}
-                  <div className="w-4 h-5 relative flex flex-col justify-between">
-                    {/* Left pillar */}
-                    <div
-                      className="absolute left-0 top-1 bottom-0 w-2 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-600 rounded-sm"
-                      style={{
-                        clipPath: "polygon(0 15%, 100% 0, 100% 100%, 0 85%)",
-                      }}
-                    ></div>
-                    {/* Right pillar */}
-                    <div
-                      className="absolute right-0 top-0 bottom-1 w-2 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-600 rounded-sm"
-                      style={{
-                        clipPath: "polygon(0 0, 100% 15%, 100% 85%, 0 100%)",
-                      }}
-                    ></div>
-                    {/* Bottom connector */}
-                    <div
-                      className="absolute bottom-0 left-1 right-1 h-2 bg-gradient-to-r from-amber-600 to-amber-500"
-                      style={{
-                        clipPath: "polygon(0 100%, 100% 0, 100% 100%, 0 100%)",
-                      }}
-                    ></div>
-                    {/* Top connector */}
-                    <div
-                      className="absolute top-0 left-1 right-1 h-2 bg-gradient-to-r from-amber-400 to-amber-300"
-                      style={{
-                        clipPath: "polygon(0 0, 100% 0, 100% 100%, 0 0)",
-                      }}
-                    ></div>
-                  </div>
+                <div className="relative flex size-8 items-center justify-center overflow-hidden rounded-lg border border-amber-500/30 bg-white shadow-lg shadow-amber-500/10 transition-transform group-hover:scale-105 dark:bg-slate-950">
+                  <img
+                    src="/unlupa.logo.png"
+                    alt="Logo Unlupa"
+                    className="size-full scale-[1.45] object-contain"
+                    draggable={false}
+                  />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">

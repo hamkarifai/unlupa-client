@@ -370,11 +370,25 @@ export const personalService = {
     return response.data;
   },
 
+  async getAIBookUsage(): Promise<{
+    status: number;
+    message: string;
+    data: {
+      limit: number;
+      used: number;
+      remaining: number;
+      period: string;
+    };
+  }> {
+    const response = await api.get("/api/v1/ai/book-usage");
+    return response.data;
+  },
+
   async generateAIBook(payload: {
     topic?: string;
     text?: string;
     language?: string;
-  }): Promise<{ status: number; message: string; data: { book: any } }> {
+  }): Promise<{ status: number; message: string; data: { book: any; limit?: number; used?: number; remaining?: number } }> {
     const response = await api.post("/api/v1/ai/generate-book", payload, {
       timeout: 120000,
     });

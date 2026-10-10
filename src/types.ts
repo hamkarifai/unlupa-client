@@ -109,6 +109,7 @@ export interface BookItem {
   id: string;
   bookId: string;
   masterItemId?: string | null;
+  masterBookId?: string | null;
   chapterId?: string | null;
   question: string;
   answer: string;

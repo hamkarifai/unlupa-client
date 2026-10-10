@@ -1,13 +1,14 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import { useSwipeGesture } from "../../hooks/useSwipeGesture";
-import { ClassStudent, ClassGroup } from "../../types";
+import { ClassStudent, ClassGroup, Book } from "../../types";
 import { StudentQuranView } from "./StudentQuranView";
 import { StudentBookView } from "./StudentBookView";
 import { StudentProgressReportModal } from "./StudentProgressReportModal";
 import { JuzRangeSelector } from "./JuzRangeSelector";
 import { PersonalSpace } from "../personal/PersonalSpace";
 import { isDue } from "../../lib/fsrs";
+import { UnifiedDueCard } from "../common/UnifiedDueCard";
 import { useAuthStore } from "@/features/auth/stores/auth.store";
 import {
   Dialog,
@@ -159,7 +160,10 @@ export const TeachingSpace: React.FC = () => {
     leaveClass,
     fetchClasses,
     fetchClassMembers,
+    fetchClassBooks,
     books,
+    setBooks,
+    library,
     items,
     language,
     setActiveSpace,
@@ -242,6 +246,7 @@ export const TeachingSpace: React.FC = () => {
 
   // Image upload state
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -296,6 +301,17 @@ export const TeachingSpace: React.FC = () => {
     });
     return Array.from(classMap.values());
   }, [isTeacher, teachingClasses, myClasses]);
+
+  const selectedClassType = combinedClasses.find(
+    (cls) => cls.id === selectedClassId,
+  )?.type;
+
+  // Fetch books for selected non-quran class (both teacher and enrolled student)
+  useEffect(() => {
+    if (selectedClassId && selectedClassType === "non-quran") {
+      void fetchClassBooks(selectedClassId);
+    }
+  }, [selectedClassId, selectedClassType, fetchClassBooks]);
 
   // Filter classes by category & search query
   const quranClasses = combinedClasses.filter((c) => c.type === "quran");
@@ -596,11 +612,9 @@ export const TeachingSpace: React.FC = () => {
     setIsManagingBook(false);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formState.name.trim()) return;
-
-    const autoCode = generateRandomCode(formState.type);
+    if (!formState.name.trim() || isCreatingClass) return;
 
     let finalCover = formState.coverUrl;
     if (!finalCover) {
@@ -616,22 +630,26 @@ export const TeachingSpace: React.FC = () => {
         ? parseTargetJuzToNumbers(formState.targetJuz)
         : undefined;
 
-    const created = createTeachingClass({
-      name: formState.name.trim(),
-      type: formState.type,
-      code: autoCode,
-      description: formState.description.trim(),
-      coverUrl: finalCover,
-      requiredJuzList,
-      assignedBookIds:
-        formState.type === "non-quran"
-          ? [formState.assignedBookId].filter(Boolean)
-          : undefined,
-    });
+    setIsCreatingClass(true);
+    try {
+      const created = await createTeachingClass({
+        name: formState.name.trim(),
+        type: formState.type,
+        description: formState.description.trim(),
+        coverUrl: finalCover,
+        requiredJuzList,
+        assignedBookIds:
+          formState.type === "non-quran"
+            ? [formState.assignedBookId].filter(Boolean)
+            : undefined,
+      });
 
-    setIsCreateOpen(false);
-    setActiveCategory(created.type);
-    setCreatedClassSuccess(created);
+      setIsCreateOpen(false);
+      setActiveCategory(created.type);
+      setCreatedClassSuccess(created);
+    } finally {
+      setIsCreatingClass(false);
+    }
   };
 
   const getItemTargetInfo = (cls: ClassGroup) => {
@@ -1264,9 +1282,9 @@ export const TeachingSpace: React.FC = () => {
       {/* --------------------------------------------------------------------- */}
       <ModalOverlay
         isOpen={isCreateOpen}
-        isDismissable={!isUploadingImage}
+        isDismissable={!isUploadingImage && !isCreatingClass}
         onOpenChange={(isOpen) => {
-          if (isUploadingImage) return;
+          if (isUploadingImage || isCreatingClass) return;
           setIsCreateOpen(isOpen);
         }}
       >
@@ -1304,7 +1322,7 @@ export const TeachingSpace: React.FC = () => {
                         : "Tutup modal buat kelas"
                     }
                     onPress={close}
-                    isDisabled={isUploadingImage}
+                    isDisabled={isUploadingImage || isCreatingClass}
                     className="absolute right-4 top-4"
                   />
                 </div>
@@ -1549,7 +1567,7 @@ export const TeachingSpace: React.FC = () => {
                     color="secondary"
                     size="md"
                     onPress={close}
-                    isDisabled={isUploadingImage}
+                    isDisabled={isUploadingImage || isCreatingClass}
                     className="w-full sm:w-auto"
                   >
                     {language === "en" ? "Cancel" : "Batal"}
@@ -1558,7 +1576,8 @@ export const TeachingSpace: React.FC = () => {
                     type="submit"
                     size="md"
                     iconLeading={Sparkles}
-                    isDisabled={!formState.name.trim() || isUploadingImage}
+                    isDisabled={!formState.name.trim() || isUploadingImage || isCreatingClass}
+                    isLoading={isCreatingClass}
                     className="w-full sm:w-auto"
                   >
                     {language === "en" ? "Create class" : "Buat kelas"}
@@ -1979,8 +1998,42 @@ export const TeachingSpace: React.FC = () => {
   if (selectedClass) {
     const isQuran = selectedClass.type === "quran";
     const assignedBook =
-      !isQuran && selectedClass.assignedBookIds?.[0]
-        ? books.find((b) => b.id === selectedClass.assignedBookIds?.[0])
+      !isQuran
+        ? (selectedClass.assignedBookIds?.[0]
+            ? books.find((b) => b.id === selectedClass.assignedBookIds?.[0]) ||
+              books.find(
+                (b) =>
+                  b.id ===
+                  `class-book-${selectedClass.id}-${selectedClass.assignedBookIds?.[0]}`,
+              ) ||
+              library.find((l) => l.book.id === selectedClass.assignedBookIds?.[0] || l.id === selectedClass.assignedBookIds?.[0])?.book
+            : null) ||
+          books.find(
+            (b) =>
+              b.id === selectedClass.id || b.classId === selectedClass.id,
+          ) ||
+          library.find((l) => l.book.id === selectedClass.id || l.id === selectedClass.id)?.book ||
+          books.find(
+            (b) =>
+              b.title.trim().toLowerCase() ===
+              selectedClass.name.trim().toLowerCase(),
+          ) ||
+          ({
+            id:
+              selectedClass.assignedBookIds?.[0] ||
+              `class-book-${selectedClass.id}`,
+            userId: selectedClass.teacherId || "",
+            title: selectedClass.name,
+            description: selectedClass.description || "",
+            coverUrl: selectedClass.coverUrl,
+            category: "class",
+            classId: selectedClass.id,
+            isReadonly: !isClassOwner,
+            isPublic: false,
+            authorName: selectedClass.teacherName || "Pengajar",
+            createdAt: selectedClass.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as Book)
         : null;
     const assignedId = selectedClass.assignedBookIds?.[0];
     const assignedClassBookId = assignedId
@@ -2053,11 +2106,19 @@ export const TeachingSpace: React.FC = () => {
         : 100;
 
     if (isManagingBook && assignedBook) {
+      const realBookId = (assignedBook as any).masterBookId || (assignedBook.id.startsWith('class-book-') ? assignedBook.id.split('-').slice(3).join('-') : assignedBook.id);
+
       return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 h-[calc(100vh-64px)]">
           <PersonalSpace
-            initialBookId={assignedBook.id}
-            isEmbeddedTeacherView={true}
+            initialBookId={realBookId}
+            classBanner={{
+              className: selectedClass.name,
+              classCode: selectedClass.code,
+              teacherName: selectedClass.teacherName,
+              onLeaveClass: () => leaveClass(selectedClass.id),
+            }}
+            isEmbeddedTeacherView={isClassOwner}
             onExitEmbedded={() => setIsManagingBook(false)}
           />
         </div>
@@ -2233,12 +2294,25 @@ export const TeachingSpace: React.FC = () => {
                       onClick={() => {
                         setIsManagingBook(true);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-bold text-brand-700 transition-colors hover:bg-brand-100"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer"
                     >
                       <BookOpen className="w-3 h-3" />
                       {language === "en"
                         ? "Edit Book Content"
                         : "Edit Konten Buku"}
+                    </button>
+                  )}
+                  {!isClassOwner && assignedBook && (
+                    <button
+                      onClick={() => {
+                        setIsManagingBook(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-bold text-brand-700 transition-colors hover:bg-brand-100 cursor-pointer"
+                    >
+                      <BookOpen className="w-3 h-3" />
+                      {language === "en"
+                        ? "Open Class Book"
+                        : "Buka Materi Kitab"}
                     </button>
                   )}
                 </div>
@@ -2279,26 +2353,120 @@ export const TeachingSpace: React.FC = () => {
 
           {/* Embedded Progress Card */}
           {!isClassOwner ? (
-            <div className="flex items-center gap-4 rounded-xl border border-slate-200/70 bg-slate-50 p-3.5 dark:border-slate-700/60 dark:bg-slate-800/60 sm:p-4">
-              <div className="flex size-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-brand-50 text-xl font-bold text-brand-700 shadow-sm dark:border-slate-700 dark:bg-brand-950/40 dark:text-brand-300">
-                {Math.max(
-                  selectedClass.studentCount ?? 0,
-                  selectedClass.students.length,
-                )}
+            !isQuran && assignedBook ? (
+              (() => {
+                const studentClassBookId = `class-book-${selectedClass.id}-${assignedBook.id}`;
+                const studentClassItems = items.filter(
+                  (i) =>
+                    i.bookId === studentClassBookId ||
+                    i.bookId === assignedBook.id,
+                );
+                const studentActiveItems = studentClassItems.filter(
+                  (i) => i.isActive,
+                );
+                const studentDueItems = studentActiveItems.filter((i) =>
+                  isDue(i.fsrsData.nextReview, i.isActive),
+                );
+                const studentMasteredItems = studentActiveItems.filter(
+                  (i) =>
+                    i.status === "mastered" ||
+                    (i.fsrsData?.stability || 0) >= 30,
+                );
+
+                return (
+                  <div className="flex flex-col gap-4 rounded-2xl border border-brand-200 bg-brand-50/40 p-4 sm:p-5 dark:border-brand-900/40 dark:bg-brand-950/20">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-brand-100 dark:border-brand-900/40">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">
+                            {language === "en"
+                              ? "Class Book Progress"
+                              : "Progres Materi Kitab Kelas"}
+                          </span>
+                          <span className="rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold text-[10px] px-2 py-0.5 border border-amber-200 dark:border-amber-800">
+                            {language === "en"
+                              ? "Read-Only (Cards can be activated)"
+                              : "Mode Santri (Aktifkan Kartu)"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                          {language === "en"
+                            ? "You have full access to study and activate cards in this book. Your progress is synced to the teacher."
+                            : "Anda dapat mengakses kitab ini, mengaktifkan kartu hafalan/materi, dan melakukan review harian. Progres Anda otomatis dipantau oleh pengajar."}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsManagingBook(true)}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        <span>
+                          {language === "en"
+                            ? "Open & Study Book"
+                            : "Buka & Pelajari Kitab"}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 text-center">
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                          Total Kartu
+                        </span>
+                        <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5 block">
+                          {studentClassItems.length}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200/70 dark:border-emerald-900/40 text-center">
+                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 block">
+                          Kartu Aktif
+                        </span>
+                        <span className="text-base sm:text-lg font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 block">
+                          {studentActiveItems.length}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/70 dark:border-amber-900/40 text-center">
+                        <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">
+                          Perlu Review
+                        </span>
+                        <span className="text-base sm:text-lg font-bold text-amber-700 dark:text-amber-300 mt-0.5 block">
+                          {studentDueItems.length}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200/70 dark:border-indigo-900/40 text-center">
+                        <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 block">
+                          Mapan
+                        </span>
+                        <span className="text-base sm:text-lg font-bold text-indigo-700 dark:text-indigo-300 mt-0.5 block">
+                          {studentMasteredItems.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="flex items-center gap-4 rounded-xl border border-slate-200/70 bg-slate-50 p-3.5 dark:border-slate-700/60 dark:bg-slate-800/60 sm:p-4">
+                <div className="flex size-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-brand-50 text-xl font-bold text-brand-700 shadow-sm dark:border-slate-700 dark:bg-brand-950/40 dark:text-brand-300">
+                  {Math.max(
+                    selectedClass.studentCount ?? 0,
+                    selectedClass.students.length,
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    {language === "en"
+                      ? "Registered students"
+                      : "Santri terdaftar"}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    {language === "en"
+                      ? "Student identities and progress are only visible to the class teacher."
+                      : "Identitas dan progres santri hanya dapat dilihat oleh pengajar kelas."}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  {language === "en"
-                    ? "Registered students"
-                    : "Santri terdaftar"}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                  {language === "en"
-                    ? "Student identities and progress are only visible to the class teacher."
-                    : "Identitas dan progres santri hanya dapat dilihat oleh pengajar kelas."}
-                </p>
-              </div>
-            </div>
+            )
           ) : (
             <div className="flex items-center gap-4 p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60">
               {/* Left Side: Circular Progress */}
@@ -2627,12 +2795,59 @@ export const TeachingSpace: React.FC = () => {
     (total, classGroup) => total + getClassStudentCount(classGroup),
     0,
   );
-  const currentDueCount = currentCategoryClasses.reduce(
-    (total, classGroup) =>
-      total +
-      classGroup.students.filter(
-        (student) => getStudentDueInfo(student, classGroup).isDue,
-      ).length,
+
+  const getClassDueCountForCurrentUser = (cls: ClassGroup) => {
+    const isOwner = (teachingClasses || []).some((tc) => tc.id === cls.id);
+    if (isOwner) {
+      return cls.students.filter((s) => getStudentDueInfo(s, cls).isDue).length;
+    }
+    if (cls.type === "quran") {
+      return (quranStats?.dueList || []).length;
+    } else {
+      const assignedId = cls.assignedBookIds?.[0];
+      if (!assignedId) return 0;
+      const assignedClassBookId = `class-book-${cls.id}-${assignedId}`;
+      const classItems = items.filter(
+        (i) => i.bookId === assignedClassBookId || i.bookId === assignedId,
+      );
+      return classItems.filter(
+        (i) => i.isActive && isDue(i.fsrsData?.nextReview, i.isActive),
+      ).length;
+    }
+  };
+
+  const getClassActiveCountForCurrentUser = (cls: ClassGroup) => {
+    const isOwner = (teachingClasses || []).some((tc) => tc.id === cls.id);
+    if (isOwner) {
+      return cls.students.length;
+    }
+    if (cls.type === "quran") {
+      return quranStats?.active || 0;
+    } else {
+      const assignedId = cls.assignedBookIds?.[0];
+      if (!assignedId) return 0;
+      const assignedClassBookId = `class-book-${cls.id}-${assignedId}`;
+      const classItems = items.filter(
+        (i) => i.bookId === assignedClassBookId || i.bookId === assignedId,
+      );
+      return classItems.filter((i) => i.isActive).length;
+    }
+  };
+
+  const classDuePills = currentCategoryClasses
+    .map((cls) => ({
+      classGroup: cls,
+      dueCount: getClassDueCountForCurrentUser(cls),
+      activeCount: getClassActiveCountForCurrentUser(cls),
+    }))
+    .filter((p) => p.dueCount > 0);
+
+  const totalCurrentCategoryDue = classDuePills.reduce(
+    (sum, p) => sum + p.dueCount,
+    0,
+  );
+  const totalCurrentCategoryActive = currentCategoryClasses.reduce(
+    (sum, cls) => sum + getClassActiveCountForCurrentUser(cls),
     0,
   );
 
@@ -2725,7 +2940,7 @@ export const TeachingSpace: React.FC = () => {
               icon: Users,
             },
             {
-              value: currentDueCount,
+              value: totalCurrentCategoryDue,
               label: language === "en" ? "Need review" : "Perlu review",
               icon: Clock5,
             },
@@ -2746,6 +2961,53 @@ export const TeachingSpace: React.FC = () => {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Unified Due Review Banner for Classes */}
+      <section aria-label={language === "en" ? "Class review queue" : "Antrean review kelas"}>
+        <UnifiedDueCard
+          language={language}
+          title={language === "en" ? "Class Daily Review" : "Kartu Jatuh Tempo Kelas"}
+          dueCount={totalCurrentCategoryDue}
+          totalActiveCount={totalCurrentCategoryActive}
+          itemTypeLabel={
+            isTeacher
+              ? language === "en"
+                ? "students"
+                : "santri"
+              : activeCategory === "quran"
+                ? language === "en"
+                  ? "pages"
+                  : "halaman"
+                : language === "en"
+                  ? "cards"
+                  : "kartu"
+          }
+          primaryActionLabel={
+            language === "en"
+              ? `Review All (${totalCurrentCategoryDue})`
+              : `Mulai Review (${totalCurrentCategoryDue})`
+          }
+          pillGridCols="classes"
+          onStartAll={() => {
+            const firstDueClass = classDuePills[0]?.classGroup;
+            if (firstDueClass) {
+              setSelectedClassId(firstDueClass.id);
+            }
+          }}
+          filterPills={classDuePills.map((pill) => ({
+            id: pill.classGroup.id,
+            label: pill.classGroup.name,
+            count: pill.dueCount,
+            badge: pill.classGroup.code,
+            onClick: () => setSelectedClassId(pill.classGroup.id),
+          }))}
+          allCaughtUpTitle={
+            language === "en"
+              ? "All class assignments reviewed for today!"
+              : "Semua tugas review kelas tuntas hari ini!"
+          }
+        />
       </section>
 
       <section className="rounded-3xl border border-secondary bg-primary p-4 shadow-xs sm:p-5">

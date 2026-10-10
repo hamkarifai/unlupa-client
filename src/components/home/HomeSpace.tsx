@@ -1,7 +1,12 @@
 import React, { useState, useMemo } from "react";
 import { useApp } from "../../context/AppContext";
 import { useSwipeGesture } from "../../hooks/useSwipeGesture";
-import { Sparkles, Quote, Crown, ArrowRight } from "@/components/foundations/hugeicons";
+import {
+  Sparkles,
+  Quote,
+  Crown,
+  ArrowRight,
+} from "@/components/foundations/hugeicons";
 import { motion } from "motion/react";
 import { VisualReviewCalendar } from "./VisualReviewCalendar";
 import { ConsistencyJourneyWidget } from "./ConsistencyJourneyWidget";
@@ -102,10 +107,8 @@ export const HomeSpace: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2"
             >
-              <span>Ahlan, {displayName}</span>
-              <span className="inline-block animate-wave text-lg sm:text-xl">
-                👋
-              </span>
+              <span className="text-primary">Ahlan, {displayName}</span>
+              
             </motion.h1>
 
             <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 max-w-xl">
@@ -124,7 +127,10 @@ export const HomeSpace: React.FC = () => {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative overflow-hidden rounded-3xl border border-[#fb923c]/50 p-5 text-white shadow-xl shadow-[#ef6905]/15 sm:p-6"
-          style={{ background: "radial-gradient(circle at 90% 10%, rgba(251,191,36,0.34), transparent 34%), linear-gradient(135deg, #ef6905 0%, #c2410c 100%)" }}
+          style={{
+            background:
+              "radial-gradient(circle at 90% 10%, rgba(251,191,36,0.34), transparent 34%), linear-gradient(135deg, #ef6905 0%, #c2410c 100%)",
+          }}
         >
           <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full border border-white/15" />
           <div className="pointer-events-none absolute -right-3 top-14 size-20 rounded-full border border-white/10" />
@@ -140,7 +146,9 @@ export const HomeSpace: React.FC = () => {
                   Unlupa Pro
                 </div>
                 <h3 className="mt-2 text-lg font-semibold tracking-tight text-white sm:text-xl">
-                  {language === "en" ? "Unlock your complete learning journey" : "Buka seluruh perjalanan belajarmu"}
+                  {language === "en"
+                    ? "Unlock your complete learning journey"
+                    : "Buka seluruh perjalanan belajarmu"}
                 </h3>
                 <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[#ffedd5]">
                   {language === "en"
@@ -148,8 +156,17 @@ export const HomeSpace: React.FC = () => {
                     : "Akses seluruh 30 Juz, AI tanpa batas, buku pribadi, rekaman suara, dan laporan mengajar lengkap."}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {[language === "en" ? "604 Mushaf pages" : "604 halaman Mushaf", language === "en" ? "Unlimited AI" : "AI tanpa batas", language === "en" ? "Teaching tools" : "Fitur mengajar"].map((benefit) => (
-                    <span key={benefit} className="rounded-full bg-[#1d140d]/25 px-2.5 py-1 text-[10px] font-semibold text-white ring-1 ring-white/15 ring-inset">
+                  {[
+                    language === "en"
+                      ? "604 Mushaf pages"
+                      : "604 halaman Mushaf",
+                    language === "en" ? "Unlimited AI" : "AI tanpa batas",
+                    language === "en" ? "Teaching tools" : "Fitur mengajar",
+                  ].map((benefit) => (
+                    <span
+                      key={benefit}
+                      className="rounded-full bg-[#1d140d]/25 px-2.5 py-1 text-[10px] font-semibold text-white ring-1 ring-white/15 ring-inset"
+                    >
                       {benefit}
                     </span>
                   ))}

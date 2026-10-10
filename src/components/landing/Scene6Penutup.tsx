@@ -1,25 +1,34 @@
-import React from 'react';
-import { Compass, ArrowRight, ShieldCheck, Mail, Heart, CheckCircle2 } from 'lucide-react';
-import { soundEngine } from './audio';
+import React from "react";
+import {
+  Compass,
+  ArrowRight,
+  ShieldCheck,
+  Mail,
+  Heart,
+  CheckCircle2,
+} from "../foundations/hugeicons";
+import { soundEngine } from "./audio";
 
 interface Scene6PenutupProps {
   opacity: number;
   onLaunchApp: () => void;
 }
 
-export const Scene6Penutup: React.FC<Scene6PenutupProps> = ({ opacity, onLaunchApp }) => {
+export const Scene6Penutup: React.FC<Scene6PenutupProps> = ({
+  opacity,
+  onLaunchApp,
+}) => {
   if (opacity <= 0.01) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 flex flex-col justify-between items-center text-center px-4 sm:px-6 pt-24 pb-8 pointer-events-none transition-opacity duration-300 z-10"
       style={{ opacity }}
     >
       <div className="flex-1 flex flex-col justify-center items-center max-w-3xl mx-auto space-y-8">
-        
         {/* Sacred Remembrance */}
         <div className="space-y-4">
-          <p 
+          <p
             className="text-4xl sm:text-6xl font-serif text-amber-300 leading-relaxed select-none"
             style={{ fontFamily: "'Amiri', serif" }}
           >
@@ -33,10 +42,14 @@ export const Scene6Penutup: React.FC<Scene6PenutupProps> = ({ opacity, onLaunchA
         {/* Monolithic Title: Jangan Lupa */}
         <div className="space-y-3">
           <h2 className="text-4xl sm:text-6xl md:text-7xl font-sans font-black tracking-tight text-white uppercase select-none">
-            JANGAN SAMPAI <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500">LUPA LAGI.</span>
+            JANGAN SAMPAI{" "}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500">
+              LUPA LAGI.
+            </span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto font-light leading-relaxed">
-            Mulailah menjaga hafalan dan disiplin ilmu Anda sekarang. Gratis, tanpa iklan, dan sepenuhnya berpihak pada keberkahan waktu Anda.
+            Mulailah menjaga hafalan dan disiplin ilmu Anda sekarang. Gratis,
+            tanpa iklan, dan sepenuhnya berpihak pada keberkahan waktu Anda.
           </p>
         </div>
 
@@ -54,7 +67,6 @@ export const Scene6Penutup: React.FC<Scene6PenutupProps> = ({ opacity, onLaunchA
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
           </button>
         </div>
-
       </div>
 
       {/* Footer Info & Contact */}
@@ -69,7 +81,7 @@ export const Scene6Penutup: React.FC<Scene6PenutupProps> = ({ opacity, onLaunchA
           ADAPTIVE RETENTION ENGINE &bull; 604 HALAMAN MUSHAF &bull; LOCAL-FIRST
         </div>
         <div className="flex items-center gap-4 text-slate-300">
-          <button 
+          <button
             onClick={onLaunchApp}
             className="text-amber-400 hover:text-amber-300 font-bold hover:underline uppercase transition-colors"
           >

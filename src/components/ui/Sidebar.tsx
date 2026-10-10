@@ -25,11 +25,12 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded border border-border flex items-center justify-center bg-surface-1 overflow-hidden">
-              <img 
-                src="/unlupa.logo.png" 
-                alt="UNLUPA Logo" 
-                className="w-full h-full object-contain"
+            <div className="flex size-10 items-center justify-center overflow-hidden rounded-lg border border-brand-200 bg-white dark:bg-slate-950">
+              <img
+                src="/unlupa.logo.png"
+                alt="Logo Unlupa"
+                className="size-full scale-[1.45] object-contain"
+                draggable={false}
               />
             </div>
             <span className="font-display font-bold text-xl text-foreground tracking-widest">

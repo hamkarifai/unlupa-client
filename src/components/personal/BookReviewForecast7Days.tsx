@@ -173,7 +173,7 @@ export const BookReviewForecast7Days: React.FC<Props> = ({
   const hasHighLoad = forecastData.peakCount >= 100;
 
   return (
-    <section className="space-y-4 rounded-3xl border border-secondary bg-primary p-4 shadow-xs sm:p-5">
+    <section className="space-y-4 rounded-2xl border border-secondary bg-primary p-5 shadow-xs sm:rounded-3xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">

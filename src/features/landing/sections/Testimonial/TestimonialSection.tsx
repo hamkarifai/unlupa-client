@@ -29,8 +29,8 @@ export const TestimonialSection = () => {
         </p>
       </div>
 
-      <div className="scroller mb-6" data-direction="left">
-        <div className="scroller__inner">
+      <div className="scroller mb-6 w-full overflow-x-auto overscroll-x-contain">
+        <div className="scroller__inner flex w-max gap-4 px-6">
           {[...logsLeft, ...logsLeft].map((log, index) => (
             <div key={`left-${index}`} className="w-[320px] md:w-[360px] shrink-0 bg-card border border-border rounded-xl p-6 hover:border-primary/20 transition-all">
               <div className="flex items-center gap-3 mb-3">
@@ -46,8 +46,8 @@ export const TestimonialSection = () => {
         </div>
       </div>
 
-      <div className="scroller" data-direction="right">
-        <div className="scroller__inner">
+      <div className="scroller w-full overflow-x-auto overscroll-x-contain">
+        <div className="scroller__inner flex w-max gap-4 px-6">
           {[...logsRight, ...logsRight].map((log, index) => (
             <div key={`right-${index}`} className="w-[320px] md:w-[360px] shrink-0 bg-card border border-border rounded-xl p-6 hover:border-primary/20 transition-all">
               <div className="flex items-center gap-3 mb-3">

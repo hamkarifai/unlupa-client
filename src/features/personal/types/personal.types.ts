@@ -264,8 +264,10 @@ export interface RawItemEntity {
   Stability: number;
   Difficulty: number;
   ReviewCount: number;
-  EstimatedReviewSeconds: number;
+  LastReviewAt: string | null;
   NextReviewAt: string | null;
+  IntervalNextReviewAt?: string | null;
+  EstimatedReviewSeconds: number;
   CreatedAt: string;
 }
 
@@ -428,7 +430,18 @@ export interface ReviewIntervalResponse {
 export interface ReviewFsrsResponse {
   status: number;
   message: string;
-  data: Record<string, unknown>;
+  data: {
+    item_id: string;
+    status: string;
+    stability: number;
+    difficulty: number;
+    next_interval_days: number;
+    next_review_at: string | null;
+    last_review_at: string | null;
+    review_count: number;
+    content_ref: string;
+    [key: string]: unknown;
+  };
   timestamp?: string;
   path?: string;
 }
